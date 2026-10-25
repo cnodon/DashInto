@@ -18,7 +18,7 @@ final class DashboardMonitor {
     @ObservationIgnored private var metricsToken = UUID()
 
     func sample(_ tunnel: TunnelController) {
-        guard let session = tunnel.runtime?.sessionID else { reset(); return }
+        guard tunnel.state == .connected, let session = tunnel.runtime?.sessionID else { reset(); return }
         if sessionID != session {
             reset(); sessionID = session
             refreshNetwork(tunnel)
@@ -43,7 +43,7 @@ final class DashboardMonitor {
         }
     }
     func refreshNetwork(_ tunnel: TunnelController) {
-        guard let session = tunnel.runtime?.sessionID, !checking else { return }
+        guard tunnel.state == .connected, let session = tunnel.runtime?.sessionID, !checking else { return }
         probeToken = UUID(); let token = probeToken
         checking = true; sites = []; egress = nil
         probeTask = Task { [weak self] in

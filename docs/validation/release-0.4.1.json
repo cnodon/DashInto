@@ -1,0 +1,35 @@
+{
+  "app": "DashInto",
+  "version": "0.4.1",
+  "build": 5,
+  "date": "2026-10-25",
+  "unitTests": {
+    "passed": 39,
+    "failed": 0
+  },
+  "simulatorUITests": {
+    "passed": 4,
+    "failed": 0,
+    "physicalTestSkipped": 1
+  },
+  "releaseBuild": "passed",
+  "appAndExtensionSigning": "passed",
+  "physicalInstallation": {
+    "model": "iPhone 15 Pro Max",
+    "method": "in_place_update",
+    "result": "passed",
+    "installedVersion": "0.4.1 (5)",
+    "launch": "passed",
+    "installedVersionEvidence": ".build/release-0.4.1-installed.json",
+    "launchEvidence": ".build/release-0.4.1-launch.json"
+  },
+  "physicalVPN": "not_retested_for_0.4.1",
+  "connectionTimingBenchmark": "not_measured",
+  "testFlight": "not_configured",
+  "githubRepository": "https://github.com/cnodon/DashInto",
+  "changes": [
+    "State-specific home layout and direct subscription selection",
+    "Connected dashboard retained with separate network-check feedback",
+    "Coalesced pending runtime snapshots and fenced cancelled polling callbacks"
+  ]
+}

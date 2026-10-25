@@ -2,7 +2,13 @@
 
 先读 [实施与验证记录](IMPLEMENTATION_STATUS.md)、[本地真机验收](LOCAL_ACCEPTANCE.md) 和根目录 README，沿用现有工程。原始 [产品技术规划](CLASH_DASH_PLAN.md) 是目标规格，不能把其验收门槛当成已经通过。
 
-## 当前接续点
+## 当前接续点（0.4.1）
+
+最新版本是 **DashInto 0.4.1 (5)**，请以根目录 README、[首页交互调整](INTERACTION_REDESIGN.md) 和 [验证记录](validation/release-0.4.1.json) 为准。五个 Tab 为首页、订阅、代理、本机信息、设置；已实现 GitHub Release 检查入口，TestFlight 尚未接入。未连接首页突出连接、订阅和线路，已连接保留实时数据布局。启动与前台轮询共享在途核心快照，旧轮询回调不得更新新状态。
+
+39 项共享测试、4 项模拟器 UI 用例通过，Release 和签名校验通过；0.4.1 已覆盖安装到 iPhone 15 Pro Max 并启动，未重新进行本版 VPN 通网或耗时基准测试。用户本轮明确授权将代码提交并推送到 `https://github.com/cnodon/DashInto`，不包含创建 GitHub Release、上传 TestFlight 或修改私人订阅的授权。
+
+## 历史接续点（0.3.0）
 
 用户已要求把核心需求落代码、部署并测试。**0.3.0 (3)** 已实现使用流程 P0；继续工作前读 [0.3.0 记录](RELEASE_0_3_0.md)。不要把旧 0.2.0 的失败或未验证状态当成当前结论。
 

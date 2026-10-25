@@ -33,6 +33,7 @@ final class AppModel {
     @ObservationIgnored private var lastSampleSession: String?
     @ObservationIgnored private var lastGroupRefresh = Date.distantPast
     @ObservationIgnored private var healthyGeneration: String?
+    @ObservationIgnored private var loading = false
 
     var activeProfile: Profile? { library.activeProfile }
     var runningProfile: Profile? {
@@ -74,6 +75,14 @@ final class AppModel {
         guard tunnel.runtime != nil, let group = homeGroup else { return nil }
         return ProxySelection.resolvedLeaf(group: group.name, groups: groups)
     }
+    var plannedHomeRoute: String {
+        if activeSummary?.isDirectOnly == true { return "仅直连，不提供代理线路" }
+        guard let group = homeGroup else { return "沿用订阅默认策略，无需先选节点" }
+        if let leaf = ProxySelection.resolvedLeaf(group: group.name, groups: displayGroups) {
+            return "已选 · " + leaf
+        }
+        return group.isSelectable ? "沿用订阅默认节点 · 可手动更换" : "由订阅自动选择节点"
+    }
     var canEditRoutes: Bool { !busy && !connection.step.inProgress && (tunnel.phase == .stopped || tunnel.runtime != nil) }
     var routeDescription: String {
         if activeSummary?.isDirectOnly == true { return "仅直连，不提供代理线路" }
@@ -101,6 +110,8 @@ final class AppModel {
         store = ProfileStore(root: profileRoot, keyProvider: KeychainKeyProvider(accessGroup: group))
     }
     func load() async {
+        guard !loading else { return }
+        loading = true; defer { loading = false }
         do {
             library = try await store.library()
             if !connection.step.inProgress { try await tunnel.load() }

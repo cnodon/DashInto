@@ -695,8 +695,8 @@
 				"ENABLE_USER_SCRIPT_SANDBOXING" = "YES";
 				"APP_BUNDLE_ID" = "app.clashdash.ios";
 				"APP_GROUP_ID" = "group.app.clashdash.ios";
-				"CURRENT_PROJECT_VERSION" = "4";
-				"MARKETING_VERSION" = "0.4.0";
+				"CURRENT_PROJECT_VERSION" = "5";
+				"MARKETING_VERSION" = "0.4.1";
 				"SWIFT_EMIT_LOC_STRINGS" = "YES";
 				"SWIFT_OPTIMIZATION_LEVEL" = "-Onone";
 				"DEBUG_INFORMATION_FORMAT" = "dwarf";
@@ -720,8 +720,8 @@
 				"ENABLE_USER_SCRIPT_SANDBOXING" = "YES";
 				"APP_BUNDLE_ID" = "app.clashdash.ios";
 				"APP_GROUP_ID" = "group.app.clashdash.ios";
-				"CURRENT_PROJECT_VERSION" = "4";
-				"MARKETING_VERSION" = "0.4.0";
+				"CURRENT_PROJECT_VERSION" = "5";
+				"MARKETING_VERSION" = "0.4.1";
 				"SWIFT_EMIT_LOC_STRINGS" = "YES";
 				"SWIFT_OPTIMIZATION_LEVEL" = "-O";
 				"DEBUG_INFORMATION_FORMAT" = "dwarf-with-dsym";

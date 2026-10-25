@@ -14,6 +14,27 @@ public enum TunnelPhase: Sendable { case stopped, starting, running, stopping }
     func updateRuntime() async
 }
 
+/// Shares a pending snapshot between startup and foreground polling. A new connection epoch
+/// gets a new request; completion of an older request cannot evict the newer flight.
+@MainActor public final class RuntimeSnapshotLoader {
+    private var flight: (epoch: Int, id: UUID, task: Task<RuntimeInfo, Error>)?
+    public init() {}
+    public func load(epoch: Int, operation: @escaping @MainActor () async throws -> RuntimeInfo) async throws -> RuntimeInfo {
+        try Task.checkCancellation()
+        let current: (epoch: Int, id: UUID, task: Task<RuntimeInfo, Error>)
+        if let flight, flight.epoch == epoch { current = flight }
+        else {
+            flight?.task.cancel()
+            current = (epoch, UUID(), Task { try await operation() })
+            flight = current
+        }
+        defer { if flight?.id == current.id { flight = nil } }
+        let result = try await current.task.value
+        try Task.checkCancellation()
+        return result
+    }
+}
+
 public struct NetworkCheck: Sendable, Equatable {
     public let passed: Int
     public let total: Int

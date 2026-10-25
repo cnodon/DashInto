@@ -33,6 +33,8 @@ final class TunnelController: ConnectionDriving {
     @ObservationIgnored private var manager: NETunnelProviderManager?
     @ObservationIgnored private var observer: NSObjectProtocol?
     @ObservationIgnored private var polling: Task<Void, Never>?
+    @ObservationIgnored private let snapshotLoader = RuntimeSnapshotLoader()
+    @ObservationIgnored private var pollingToken = UUID()
     @ObservationIgnored private var epoch = 0
     @ObservationIgnored private var configurationEpoch = 0
     @ObservationIgnored private var startRequestedAt = Date.distantFuture
@@ -166,28 +168,32 @@ final class TunnelController: ConnectionDriving {
         guard state == .connected else { return }
         let requestedEpoch = epoch
         do {
-            let value = try await request("snapshot")
-            guard requestedEpoch == epoch, state == .connected else { return }
-            runtime = try JSONDecoder().decode(RuntimeInfo.self, from: value)
+            let value = try await snapshotLoader.load(epoch: requestedEpoch) { [self] in
+                try JSONDecoder().decode(RuntimeInfo.self, from: await request("snapshot"))
+            }
+            guard !Task.isCancelled, requestedEpoch == epoch, state == .connected else { return }
+            runtime = value
             lastError = nil
         } catch {
-            guard requestedEpoch == epoch, state == .connected else { return }
+            guard !Task.isCancelled, requestedEpoch == epoch, state == .connected else { return }
             runtime = nil; lastError = error.localizedDescription
         }
     }
     func startPolling(_ onSample: @escaping @MainActor () -> Void) {
         stopPolling()
+        let token = pollingToken
         polling = Task { [weak self] in
             while !Task.isCancelled {
                 guard let self else { return }
                 self.refreshState()
                 if self.state == .connected { await self.updateRuntime() }
+                guard !Task.isCancelled, self.pollingToken == token else { return }
                 onSample()
                 try? await Task.sleep(for: .seconds(1))
             }
         }
     }
-    func stopPolling() { polling?.cancel(); polling = nil }
+    func stopPolling() { pollingToken = UUID(); polling?.cancel(); polling = nil }
 }
 
 private final class ReplyGate: @unchecked Sendable {

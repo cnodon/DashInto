@@ -1,8 +1,8 @@
 # DashInto
 
-原生 SwiftUI iOS 代理客户端，当前本地版本 **DashInto 0.4.0 (4)**。五个标签为首页、订阅、代理、本机信息、设置。首页用实时曲线、额度环、节点速率和网站状态展示核心信息；更新入口连接公共仓库 `cnodon/DashInto`。
+原生 SwiftUI iOS 代理客户端，当前版本 **DashInto 0.4.1 (5)**。五个标签为首页、订阅、代理、本机信息、设置。首页用实时曲线、额度环、节点速率和网站状态展示核心信息；更新入口连接公共仓库 `cnodon/DashInto`。
 
-0.4.0 已完成本地构建、签名验证、36 项单元测试和 4 项模拟器 UI 测试，并于 2026-10-25 覆盖安装到 iPhone、成功启动。本版真机联网、后台更新唤醒和 TestFlight 分发尚未验收。上一版 0.3.0 的真机 VPN 证据保留，不能代替本版验收。见 [0.4.0 交付与验收](docs/RELEASE_0_4_0.md)。
+0.4.1 优化未连接首页：连接操作 → 当前订阅与额度 → 连接方式，隐藏空图表和待检测项；已连接的数据布局保留。核心快照请求合并，旧轮询回调失效保护。39 项单元测试、4 项模拟器 UI 测试、Release 构建和签名校验通过；2026-10-25 已覆盖安装到 iPhone 15 Pro Max 并启动。真机 VPN 通网及连接耗时、后台更新唤醒和 TestFlight 分发尚未验收；历史 0.3.0 的 VPN 证据不能替代本版验收。见 [首页交互调整](docs/INTERACTION_REDESIGN.md) 和 [0.4.1 验证记录](docs/validation/release-0.4.1.json)。
 
 输入一次 HTTPS Clash/mihomo 订阅地址，自动准备节点、策略组、规则、DNS、provider 和所需地理数据库。也支持分享链接、Base64 节点订阅、Shadowrocket 等客户端的部分节点导出格式；节点集合会生成手动选择策略，不承诺迁移原客户端的专有路由和脚本。
 
@@ -23,14 +23,14 @@
 
 | 验证层 | 结果 |
 | --- | --- |
-| 共享包 | 0.4.0：36 项测试通过 |
+| 共享包 | 0.4.1：39 项测试通过 |
 | 原生导入兼容性 | 47 项检查通过；SDK 报告 28 种可识别分享 scheme（含别名） |
 | 独立协议服务端 | 12 组通过；覆盖 SS/SS2022、Trojan、VMess、VLESS、Hysteria2、TUIC、AnyTLS、SOCKS5、HTTP CONNECT；除 HTTP 外均测 TCP 与 UDP |
 | 用户授权的真实订阅 | 36 节点、31 组、6454 条 iOS 可用规则；核心预检、数据库准备和加密存储往返通过 |
 | 真实节点联网 | HTTPS 全部曾通过，Trojan 出现一次瞬时失败后复测恢复；AnyTLS UDP DNS 通过，机场 Trojan UDP 未通过（macOS 用户态） |
-| 模拟器 UI | 0.4.0：4 项通过，含五个 Tab、空订阅、更新入口、导入与持久化 |
-| iOS 构建与签名 | 0.4.0 Release App/Extension、VPN/App Group/Keychain 权限校验通过 |
-| iPhone | 0.4.0 (4) Release 已覆盖安装并启动；本版 VPN 待验收。历史 0.3.0：1 条 Release UI 用例通过，真实订阅 HTTPS、AnyTLS UDP、断开及重连通过 |
+| 模拟器 UI | 0.4.1：4 项通过，含首页选择订阅、未连接状态、离线线路持久化、五个 Tab 与更新入口 |
+| iOS 构建与签名 | 0.4.1 Release App/Extension、VPN/App Group/Keychain 权限校验通过 |
+| iPhone | 0.4.1 (5) Release 已覆盖安装并启动；本版 VPN 待验收。历史 0.3.0：1 条 Release UI 用例通过，真实订阅 HTTPS、AnyTLS UDP、断开及重连通过 |
 
 当前模拟器交互测试、证据位置和限制见[实施与验证记录](docs/IMPLEMENTATION_STATUS.md)。真实订阅只用于本机实验，未写入源码；没有修改 Mac 上 Clash Verge 的运行配置。
 
