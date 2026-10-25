@@ -1,0 +1,26 @@
+{
+  "date": "2026-10-25",
+  "appVersion": "0.2.0",
+  "build": "2",
+  "sharedKitTests": {
+    "passed": 19,
+    "failed": 0
+  },
+  "simulatorUITests": {
+    "passed": 3,
+    "failed": 0
+  },
+  "nativeImportChecks": {
+    "passed": 47,
+    "failed": 0
+  },
+  "independentProtocolCases": {
+    "passed": 12,
+    "failed": 0,
+    "platform": "macOS userland"
+  },
+  "releaseBuildAndSigningPassed": true,
+  "privateFixturesRemoved": true,
+  "iPhoneVPNValidation": "Pending user reconnecting device and allowing VPN",
+  "airportTrojanUDP": "Failed; retained honestly in subscription-network.json"
+}

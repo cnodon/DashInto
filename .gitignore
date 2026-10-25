@@ -1,0 +1,13 @@
+.DS_Store
+__pycache__/
+.build/
+.artifacts/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+Vendor/Clash.xcframework/
+Local.xcconfig
+*.mobileprovision
+*.p12
+*.p8
+*.ipa

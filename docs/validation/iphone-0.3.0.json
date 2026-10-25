@@ -1,0 +1,97 @@
+{
+  "appVersion" : "0.3.0 (3)",
+  "checks" : [
+    {
+      "check" : "import",
+      "geodataCount" : 1,
+      "groups" : 31,
+      "nodes" : 36,
+      "passed" : true,
+      "rules" : 6454
+    },
+    {
+      "check" : "exact-import-generation",
+      "passed" : true
+    },
+    {
+      "check" : "default-routing-https",
+      "passed" : true,
+      "targetsPassed" : 2
+    },
+    {
+      "check" : "packet-tunnel-and-ipc",
+      "coreVersion" : "1.19.33",
+      "passed" : true
+    },
+    {
+      "check" : "global-node-selection",
+      "passed" : true,
+      "protocol" : "anytls"
+    },
+    {
+      "bytes" : 0,
+      "check" : "https-204",
+      "httpStatus" : 204,
+      "passed" : true
+    },
+    {
+      "bytes" : 68,
+      "check" : "https-apple",
+      "httpStatus" : 200,
+      "passed" : true
+    },
+    {
+      "bytes" : 16297,
+      "check" : "observed-tunnel-bytes",
+      "passed" : true
+    },
+    {
+      "check" : "system-udp-dns",
+      "passed" : true
+    },
+    {
+      "check" : "proxy-udp-dns",
+      "errorCode" : "",
+      "passed" : true,
+      "protocol" : "anytls"
+    },
+    {
+      "check" : "node-delay",
+      "milliseconds" : 124,
+      "passed" : true
+    },
+    {
+      "check" : "rule-mode",
+      "passed" : true
+    },
+    {
+      "check" : "disconnect",
+      "passed" : true
+    },
+    {
+      "bytes" : 69,
+      "check" : "network-after-disconnect",
+      "httpStatus" : 200,
+      "passed" : true
+    },
+    {
+      "bytes" : 69,
+      "check" : "https-after-reconnect",
+      "httpStatus" : 200,
+      "passed" : true
+    },
+    {
+      "check" : "reconnect",
+      "passed" : true
+    }
+  ],
+  "mode" : "subscription",
+  "passed" : true,
+  "platform" : "physical iPhone Packet Tunnel",
+  "runID" : "1d48dc32-17cf-4891-9fd1-8b31c1b7247c",
+  "sampledPeakCoreMemoryBytes" : 16729832,
+  "stage" : "completed",
+  "systemState" : "disconnected",
+  "terminal" : true,
+  "timestamp" : "2026-10-25T01:42:36Z"
+}

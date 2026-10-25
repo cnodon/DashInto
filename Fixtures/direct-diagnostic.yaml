@@ -1,0 +1,18 @@
+# No subscription, credentials or remote proxy. This diagnoses the local tunnel only.
+mode: rule
+ipv6: true
+proxies: []
+proxy-groups:
+  - name: 网络诊断
+    type: select
+    proxies: [DIRECT]
+rules:
+  - MATCH,DIRECT
+dns:
+  enable: true
+  enhanced-mode: fake-ip
+  fake-ip-range: 198.18.0.1/16
+  default-nameserver: [223.5.5.5, 1.1.1.1]
+  nameserver:
+    - https://dns.alidns.com/dns-query
+    - https://cloudflare-dns.com/dns-query

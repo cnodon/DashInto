@@ -1,0 +1,92 @@
+{
+  "platform": "macOS userland, not iOS Packet Tunnel",
+  "reference": "separate mihomo process",
+  "results": [
+    {
+      "name": "Shadowsocks AEAD",
+      "passed": true,
+      "referenceAvailable": true,
+      "tcpHTTP": true,
+      "udpDNS": true
+    },
+    {
+      "name": "Shadowsocks 2022",
+      "passed": true,
+      "referenceAvailable": true,
+      "tcpHTTP": true,
+      "udpDNS": true
+    },
+    {
+      "name": "Trojan TLS",
+      "passed": true,
+      "referenceAvailable": true,
+      "tcpHTTP": true,
+      "udpDNS": true,
+      "wrongCertificatePinRejected": true
+    },
+    {
+      "name": "Trojan WebSocket TLS",
+      "passed": true,
+      "referenceAvailable": true,
+      "tcpHTTP": true,
+      "udpDNS": true
+    },
+    {
+      "name": "VMess TCP",
+      "passed": true,
+      "referenceAvailable": true,
+      "tcpHTTP": true,
+      "udpDNS": true
+    },
+    {
+      "name": "VMess WebSocket TLS",
+      "passed": true,
+      "referenceAvailable": true,
+      "tcpHTTP": true,
+      "udpDNS": true
+    },
+    {
+      "name": "VLESS TLS",
+      "passed": true,
+      "referenceAvailable": true,
+      "tcpHTTP": true,
+      "udpDNS": true
+    },
+    {
+      "name": "Hysteria2",
+      "passed": true,
+      "referenceAvailable": true,
+      "tcpHTTP": true,
+      "udpDNS": true
+    },
+    {
+      "name": "TUIC v5",
+      "passed": true,
+      "referenceAvailable": true,
+      "tcpHTTP": true,
+      "udpDNS": true
+    },
+    {
+      "name": "AnyTLS",
+      "passed": true,
+      "referenceAvailable": true,
+      "tcpHTTP": true,
+      "udpDNS": true
+    },
+    {
+      "name": "SOCKS5",
+      "passed": true,
+      "referenceAvailable": true,
+      "tcpHTTP": true,
+      "udpDNS": true
+    },
+    {
+      "name": "HTTP CONNECT",
+      "passed": true,
+      "referenceAvailable": true,
+      "tcpHTTP": true,
+      "udpDNS": null
+    }
+  ],
+  "passed": true
+}

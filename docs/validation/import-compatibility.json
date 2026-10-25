@@ -1,0 +1,223 @@
+{
+  "checks": [
+    {
+      "name": "Shadowrocket exporter record 1: accepted",
+      "passed": true
+    },
+    {
+      "name": "Shadowrocket exporter record 2: accepted",
+      "passed": true
+    },
+    {
+      "name": "Shadowrocket exporter record 3: coreUnsupported",
+      "passed": true
+    },
+    {
+      "name": "Shadowrocket exporter record 4: coreUnsupported",
+      "passed": true
+    },
+    {
+      "name": "Shadowrocket exporter record 5: accepted",
+      "passed": true
+    },
+    {
+      "name": "Shadowrocket exporter record 6: rejected",
+      "passed": true
+    },
+    {
+      "name": "Shadowrocket exporter record 7: rejected",
+      "passed": true
+    },
+    {
+      "name": "Shadowrocket exporter record 8: accepted",
+      "passed": true
+    },
+    {
+      "name": "Shadowrocket exporter record 9: accepted",
+      "passed": true
+    },
+    {
+      "name": "Shadowrocket exporter record 10: accepted",
+      "passed": true
+    },
+    {
+      "name": "Shadowrocket exporter record 11: coreUnsupported",
+      "passed": true
+    },
+    {
+      "name": "Shadowrocket exporter record 12: coreUnsupported",
+      "passed": true
+    },
+    {
+      "name": "Shadowrocket exporter record 13: rejected",
+      "passed": true
+    },
+    {
+      "name": "Shadowrocket exporter record 14: rejected",
+      "passed": true
+    },
+    {
+      "name": "Shadowrocket exporter record 15: coreUnsupported",
+      "passed": true
+    },
+    {
+      "name": "Shadowrocket exporter record 16: coreUnsupported",
+      "passed": true
+    },
+    {
+      "name": "Shadowrocket exporter record 17: accepted",
+      "passed": true
+    },
+    {
+      "name": "Shadowrocket exporter record 18: rejected",
+      "passed": true
+    },
+    {
+      "name": "Shadowrocket exporter record 19: accepted",
+      "passed": true
+    },
+    {
+      "name": "Shadowrocket exporter record 20: accepted",
+      "passed": true
+    },
+    {
+      "name": "Shadowrocket exporter record 21: accepted",
+      "passed": true
+    },
+    {
+      "name": "Shadowrocket exporter record 22: accepted",
+      "passed": true
+    },
+    {
+      "name": "Shadowrocket exporter record 23: accepted",
+      "passed": true
+    },
+    {
+      "name": "Shadowrocket exporter record 24: accepted",
+      "passed": true
+    },
+    {
+      "name": "Shadowrocket exporter record 25: accepted",
+      "passed": true
+    },
+    {
+      "name": "Shadowrocket exporter record 26: accepted",
+      "passed": true
+    },
+    {
+      "name": "Shadowrocket exporter record 27: accepted",
+      "passed": true
+    },
+    {
+      "name": "Shadowrocket exporter record 28: accepted",
+      "passed": true
+    },
+    {
+      "name": "Shadowrocket exporter record 29: accepted",
+      "passed": true
+    },
+    {
+      "name": "Shadowrocket exporter record 30: accepted",
+      "passed": true
+    },
+    {
+      "name": "Shadowrocket exporter record 31: accepted",
+      "passed": true
+    },
+    {
+      "name": "Shadowrocket exporter record 32: accepted",
+      "passed": true
+    },
+    {
+      "name": "Shadowrocket exporter record 33: rejected",
+      "passed": true
+    },
+    {
+      "name": "Shadowrocket exporter record 34: rejected",
+      "passed": true
+    },
+    {
+      "name": "Shadowrocket exporter record 35: accepted",
+      "passed": true
+    },
+    {
+      "name": "Shadowrocket exporter record 36: accepted",
+      "passed": true
+    },
+    {
+      "name": "Shadowrocket exporter record 37: accepted",
+      "passed": true
+    },
+    {
+      "name": "Shadowrocket exporter record 38: accepted",
+      "passed": true
+    },
+    {
+      "name": "Shadowrocket exporter record 39: accepted",
+      "passed": true
+    },
+    {
+      "name": "Shadowrocket exporter record 40: accepted",
+      "passed": true
+    },
+    {
+      "name": "Base64 Shadowrocket subscription bundle",
+      "passed": true
+    },
+    {
+      "name": "Mixed records preserve supported nodes and disclose omissions",
+      "passed": true
+    },
+    {
+      "name": "Clash full policy survives conversion",
+      "passed": true
+    },
+    {
+      "name": "Sing-box outbounds import with explicit policy warning",
+      "passed": true
+    },
+    {
+      "name": "Surge proxy section",
+      "passed": true
+    },
+    {
+      "name": "VMess WebSocket TLS",
+      "passed": true
+    },
+    {
+      "name": "HTML and unsupported content do not become a usable profile",
+      "passed": true
+    }
+  ],
+  "passed": true,
+  "supportedImportSchemes": [
+    "anytls",
+    "http",
+    "https",
+    "hy",
+    "hy2",
+    "hy2+realm",
+    "hysteria",
+    "hysteria2",
+    "hysteria2+realm",
+    "masque",
+    "mierus",
+    "snell",
+    "socks",
+    "socks5",
+    "socks5h",
+    "ss",
+    "ssh",
+    "ssocks",
+    "ssocks5",
+    "ssr",
+    "trojan",
+    "trojan-go",
+    "tt",
+    "tuic",
+    "vless",
+    "vmess",
+    "wg",
+    "wireguard"
+  ]
+}

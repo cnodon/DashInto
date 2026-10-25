@@ -1,0 +1,12 @@
+Mode: built-in image_gen; edit.
+Reference: the fused D+i design, preserved in DashInto-icon-di-original.png.
+
+Use case: precise-object-edit / logo-brand.
+Asset: DashInto iOS app icon, final opaque square PNG.
+Input image role: EDIT TARGET, the approved minimal white D+i monogram on black.
+User refinement: more speed, decisiveness and quick forward motion, while remaining very simple, elegant and abstract.
+Keep the fused D+i construction recognizable: ONE connected main body, with the lowercase i stem shared with the lower-left D stroke, plus ONE small dot. Preserve the spacious black counter.
+Make the mark feel faster through its geometry alone: give the whole monogram a controlled 12-degree rightward italic lean; make the top-left leading terminal a crisp clean diagonal cut instead of a pill end; tighten the lower-left corner and subtly streamline the inner counter. Keep the broad right-hand D curve beautifully smooth. The i dot may become a very compact gently slanted rounded lozenge, but it must still read as the single dot of an i. Aim for a precise, confident, aerodynamic silhouette, a carefully drawn sports instrument glyph, not a busy racing badge.
+Do not add ANY speed stripes, wings, arrows, trails, extra marks or extra white pieces. Do not split the joined stem from the body. Two white components total.
+Preserve: pure white on pure black, flat vector-like silhouette, centered around 55% canvas width, generous margins, black full square background, no transparency.
+No 3D, lighting, shadows, gradients, textures, border, outer rounded square, text/wordmark or presentation mockup. One icon only.

@@ -1,0 +1,47 @@
+{
+  "app": "DashInto",
+  "version": "0.4.0",
+  "build": 4,
+  "date": "2026-10-25",
+  "unitTests": {
+    "passed": 36,
+    "failed": 0
+  },
+  "simulatorUITests": {
+    "passed": 4,
+    "failed": 0,
+    "physicalTestSkipped": 1
+  },
+  "releaseBuild": "passed",
+  "appAndExtensionSigning": "passed",
+  "icon": {
+    "size": 1024,
+    "alpha": false
+  },
+  "physicalInstallation": "passed_in_place_update",
+  "physicalLaunch": "passed",
+  "physicalInstalledVersion": "0.4.0 (4)",
+  "physicalInstallationEvidence": ".build/installed-release-0.4.0.json",
+  "additionalDeviceInstallation": {
+    "model": "iPhone 17 Pro",
+    "osVersion": "26.6.2",
+    "date": "2026-10-25",
+    "newDeviceIncludedInAppAndExtensionProfiles": true,
+    "installation": "passed_fresh_install",
+    "launch": "passed",
+    "installedVersion": "0.4.0 (4)",
+    "evidence": ".build/new-iphone-app-installed.json",
+    "signingEvidence": ".build/new-iphone-signing.json",
+    "vpn": "not_tested"
+  },
+  "physicalVPN": "not_run_for_0.4.0",
+  "testFlight": "deferred_by_user",
+  "githubRepository": "https://github.com/cnodon/DashInto",
+  "githubPublishedReleases": 0,
+  "gitCommitOrPush": false,
+  "manualGitHubCheck": {
+    "result": "no_published_releases",
+    "completed": true,
+    "on": "iOS simulator"
+  }
+}

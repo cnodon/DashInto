@@ -1,0 +1,16 @@
+{
+  "version": "0.3.0",
+  "build": "3",
+  "sharedPackageTests": 28,
+  "simulatorEndToEndCases": 3,
+  "physicalReleaseUITests": 1,
+  "physicalNetworkReport": "iphone-0.3.0.json",
+  "signedReleaseVerified": true,
+  "subscriptionURLInDeliverables": false,
+  "scannedTextFiles": 48,
+  "releaseBinarySHA256": "a035f1082461489d7b0150f19c5ceb6e5bd474c96dbf4d75b3b9cbff8b753768",
+  "limitations": [
+    "Long-duration lockscreen, network handover and power behavior not yet accepted",
+    "Physical proxy UDP validated for AnyTLS; not all subscription nodes"
+  ]
+}

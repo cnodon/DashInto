@@ -1,0 +1,50 @@
+[
+  {
+    "encryptedRoundtrip": true,
+    "fixture": "download-shadowrocket.txt",
+    "format": "Clash / mihomo YAML",
+    "geodata": [
+      "geoip.metadb"
+    ],
+    "groups": 31,
+    "nodes": 36,
+    "passed": true,
+    "rules": 6454
+  },
+  {
+    "encryptedRoundtrip": true,
+    "fixture": "download-singbox.txt",
+    "format": "Clash / mihomo YAML",
+    "geodata": [
+      "geoip.metadb"
+    ],
+    "groups": 31,
+    "nodes": 36,
+    "passed": true,
+    "rules": 6454
+  },
+  {
+    "encryptedRoundtrip": true,
+    "fixture": "download-surge.txt",
+    "format": "Clash / mihomo YAML",
+    "geodata": [
+      "geoip.metadb"
+    ],
+    "groups": 31,
+    "nodes": 36,
+    "passed": true,
+    "rules": 6454
+  },
+  {
+    "encryptedRoundtrip": true,
+    "fixture": "subscription.yaml",
+    "format": "Clash / mihomo YAML",
+    "geodata": [
+      "geoip.metadb"
+    ],
+    "groups": 31,
+    "nodes": 36,
+    "passed": true,
+    "rules": 6454
+  }
+]

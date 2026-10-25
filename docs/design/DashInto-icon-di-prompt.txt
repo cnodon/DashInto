@@ -1,0 +1,13 @@
+Mode: built-in image_gen; edit.
+Reference: the approved simplified D concept (exec-95ef83f2-bffc-4a2c-9931-b166cb3213db.png).
+
+Use case: precise-object-edit / logo-brand.
+Asset: final iOS app icon for DashInto, square opaque PNG.
+Input image role: EDIT TARGET. This is the simple horizontal white open D icon the user likes. Keep this D direction and general silhouette; do NOT turn it into an oval orbit or slanted ring.
+User request: simplify this D further and subtly fuse a lowercase i into it, creating one beautiful abstract Di monogram.
+Primary design: retain the rounded right-hand D contour. Simplify the two flared left terminals into cleaner, softer ends. Evolve the lower-left terminal upward into the short upright stem of a lowercase i, seamlessly CONNECTED to the lower D curve, sharing the same stroke. Add just ONE small round white dot directly above this stem, carefully placed in the upper-left opening. The D and the i must share geometry rather than be two separate letters side by side. The result has at most TWO white components: the single fused D/i body and the dot. Preserve generous black negative space inside. The i should be discovered on a second look; the D remains the primary silhouette.
+Style: exceptionally restrained, precise geometric logo, balanced curves, quiet contemporary elegance, soft corners, no fussy detailing, very clear at 32px. Mild forward-flow feeling comes only from the curve, not added stripes or arrows.
+Composition: optically centered, approximately 55% of square width, ample and even black breathing room.
+Preserve: pure black full square background, pure white flat mark, opaque, crisp anti-aliased contours.
+Avoid: text beyond the fused symbolic Di construction, wordmark, standalone i next to a separate D, multiple dots, detached bars, swooshes, racing lines, decoration, gradients, texture, lighting, shadows, 3D, borders, mockup, rounded outer icon frame.
+One finished icon only.

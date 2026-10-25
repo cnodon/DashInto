@@ -1,0 +1,97 @@
+{
+  "note": "macOS userland; fresh standalone UDP clients. Airport Trojan UDP did not pass, including the test-only UDP-enabled variant.",
+  "runs": {
+    "network-report.json": {
+      "coreVersion": "1.19.33",
+      "memoryBytes": 16597808,
+      "modeChangesPassed": true,
+      "nodeCount": 36,
+      "platform": "macOS userland, not iOS Packet Tunnel",
+      "protocols": [
+        {
+          "bestDelayMS": 78,
+          "protocol": "anytls",
+          "tcpHTTPSHealthy": 35,
+          "tested": 35,
+          "udpDNSPassed": true
+        },
+        {
+          "bestDelayMS": -1,
+          "protocol": "trojan",
+          "tcpHTTPSHealthy": 0,
+          "tested": 1,
+          "udpDNSPassed": false
+        }
+      ]
+    },
+    "network-report-trojan.json": {
+      "coreVersion": "1.19.33",
+      "memoryBytes": 15352600,
+      "modeChangesPassed": true,
+      "nodeCount": 36,
+      "platform": "macOS userland, not iOS Packet Tunnel",
+      "protocols": [
+        {
+          "bestDelayMS": 96,
+          "protocol": "trojan",
+          "tcpHTTPSHealthy": 1,
+          "tested": 1,
+          "udpAttempts": [
+            {
+              "errorCode": "QUERY_FAILED",
+              "passed": false,
+              "resolver": "1.1.1.1"
+            },
+            {
+              "errorCode": "QUERY_FAILED",
+              "passed": false,
+              "resolver": "223.5.5.5"
+            },
+            {
+              "errorCode": "QUERY_FAILED",
+              "passed": false,
+              "resolver": "8.8.8.8"
+            }
+          ],
+          "udpConfigured": null,
+          "udpDNSPassed": false
+        }
+      ]
+    },
+    "network-report-trojan-udp-enabled.json": {
+      "coreVersion": "1.19.33",
+      "memoryBytes": 14582576,
+      "modeChangesPassed": true,
+      "nodeCount": 36,
+      "platform": "macOS userland, not iOS Packet Tunnel",
+      "protocols": [
+        {
+          "bestDelayMS": 103,
+          "protocol": "trojan",
+          "tcpHTTPSHealthy": 1,
+          "tested": 1,
+          "udpAttempts": [
+            {
+              "errorCode": "TIMEOUT",
+              "passed": false,
+              "resolver": "1.1.1.1"
+            },
+            {
+              "errorCode": "TIMEOUT",
+              "passed": false,
+              "resolver": "223.5.5.5"
+            },
+            {
+              "errorCode": "TIMEOUT",
+              "passed": false,
+              "resolver": "8.8.8.8"
+            }
+          ],
+          "udpConfigured": true,
+          "udpDNSPassed": false
+        }
+      ],
+      "testOnlyUDPOverride": true
+    }
+  }
+}

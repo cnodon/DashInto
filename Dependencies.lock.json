@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "kernel": {
+    "repository": "https://github.com/ProjectClash/Clash",
+    "tag": "v1.19.33-clash.3",
+    "revision": "7f6b34584e4aa67f37239a9ca2a3a49b578639e3",
+    "asset": "https://github.com/ProjectClash/Clash/releases/download/v1.19.33-clash.3/Clash.xcframework.zip",
+    "sha256": "527462313d8353167fa453ece044da90f20bd4cb6d51e394c87af13ee372dd1d"
+  },
+  "adapter": {
+    "repository": "https://github.com/ProjectClash/Clash-Adapter",
+    "revision": "bdf40d4148eca4ead785fe54d724abd79d020876",
+    "files": {
+      "Sources/ClashAdapter/PacketFlowBridge.swift": "37ff8b14e12f1f10837fe4c4de6c6f7951f2c911ba05d936d3e65bcd09bccb7d",
+      "Sources/ClashAdapter/ProviderLifecycle.swift": "8d47a7ceccfd9aeba7be2481e1588656be004420e660a6f8634fa3d1fc5a9f6c",
+      "LICENSE": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",
+      "README.md": "3066687682cc8cf5ecc4325cfd30abae0951219276cf11110a65b3f1f37aa4b1"
+    }
+  },
+  "yaml": {
+    "repository": "https://github.com/jpsim/Yams",
+    "version": "5.4.0"
+  }
+}

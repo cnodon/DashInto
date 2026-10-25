@@ -1,0 +1,14 @@
+{
+  "commit": "599e4eacaa9c9a6f84b8d6439418af9d860f9aa3",
+  "wasmSHA256": "f5cc76a30d4c6128f7ce77d494dd4e8130aa7e3ce9d5b9ede7604745064bed8d",
+  "sourceURL": "https://codeload.github.com/EasyTier/EasyTier/tar.gz/599e4eacaa9c9a6f84b8d6439418af9d860f9aa3",
+  "sourceArchive": "EasyTier-source-599e4eacaa9c9a6f84b8d6439418af9d860f9aa3.tar.gz",
+  "sourceArchiveSHA256": "31c5edc1bf954e4d01cee77afa297c802d9420c7d43e03f5b08326fd4e152ff6",
+  "buildScript": "script/build-wasi-core.sh",
+  "dependencies": {
+    "archive": "EasyTier-dependencies.zip",
+    "sha256": "0cbd45c791c0f3d071f31141008d2dbba1377b6bbfa5fdfacba456ec07b1aac7",
+    "inventory": "THIRD_PARTY_LICENSES/EasyTier-Cargo/INDEX.json",
+    "sources": 1094
+  }
+}
