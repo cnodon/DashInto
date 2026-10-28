@@ -1,0 +1,51 @@
+{
+  "app": "DashInto",
+  "version": "0.4.2",
+  "build": 6,
+  "date": "2026-10-28",
+  "unitTests": {
+    "passed": 44,
+    "failed": 0
+  },
+  "simulatorUITests": {
+    "passed": 4,
+    "failed": 0,
+    "physicalTestSkipped": 1
+  },
+  "coreModeChecks": {
+    "modes": [
+      "global",
+      "direct",
+      "rule"
+    ],
+    "result": "passed",
+    "platform": "macOS userland with pinned Apple SDK; not iOS Packet Tunnel",
+    "evidence": ".build/compact-042-core.log"
+  },
+  "batchDelayQueue": {
+    "boundedConcurrency": 3,
+    "duplicateNames": "deduplicated",
+    "cancelAndLateResultIsolation": "passed_unit_tests",
+    "realSubscriptionBatch": "not_tested"
+  },
+  "releaseBuild": "passed",
+  "signing": "passed_app_and_extension",
+  "physicalInstallation": {
+    "model": "iPhone 15 Pro Max",
+    "method": "in_place_update",
+    "date": "2026-10-28",
+    "result": "passed",
+    "launch": "passed",
+    "installedVersion": "0.4.2 (6)",
+    "evidence": ".build/release-0.4.2-installed.json"
+  },
+  "physicalVPN": "not_tested_for_0.4.2",
+  "gitCommitAndPush": "not_performed_for_0.4.2",
+  "lastPhysicalDeployment": "PKR 0.4.2 (6)",
+  "evidence": {
+    "unit": ".build/compact-042-unit-final.log",
+    "simulator": ".build/compact-042-ui-final.log",
+    "build": ".build/compact-042-release-final.log",
+    "signing": ".build/compact-042-signing-final.json"
+  }
+}

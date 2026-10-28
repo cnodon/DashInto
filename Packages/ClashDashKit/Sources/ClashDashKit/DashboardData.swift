@@ -2,6 +2,40 @@ import Foundation
 import Network
 
 public enum ProxySelection {
+    /// Manual groups have a deterministic first-member default. Automatic groups stay unresolved offline.
+    public static func defaultSelections(groups: [ProxyGroup], saved: [String: String]) -> [String: String] {
+        var result = saved
+        for group in groups where group.isSelectable {
+            if let selected = result[group.name], group.members.contains(selected) || group.usesProviders == true { continue }
+            result[group.name] = group.members.first
+        }
+        return result
+    }
+    public static func preview(group: String, groups: [ProxyGroup]) -> String? {
+        var name = group, visited = Set<String>()
+        while let current = groups.first(where: { $0.name == name }) {
+            guard visited.insert(name).inserted else { return nil }
+            guard current.isSelectable else { return current.name + " · 自动选择" }
+            guard let selected = current.selected ?? current.members.first, current.members.contains(selected) || current.usesProviders == true else {
+                return current.name + " · 连接后读取节点"
+            }
+            name = selected
+        }
+        return name
+    }
+    public static func configurationGroups(summary: ConfigurationSummary) -> [ProxyGroup] {
+        // Older saved summaries did not record provider membership. Keep their saved selections
+        // until the running core confirms them, instead of deleting provider-only node choices.
+        summary.groups.map { group in
+            var value = group
+            if value.usesProviders == nil { value.usesProviders = summary.providerCount > 0 }
+            return value
+        }
+    }
+    public static func globalGroup(summary: ConfigurationSummary) -> ProxyGroup {
+        let members = summary.nodes.map(\.name) + summary.groups.map(\.name) + ["DIRECT"]
+        return ProxyGroup(name: "GLOBAL", kind: "select", members: members, usesProviders: summary.providerCount > 0)
+    }
     public static func resolvedLeaf(group: String, groups: [ProxyGroup]) -> String? {
         var name = group, visited = Set<String>()
         while let current = groups.first(where: { $0.name == name }) {
@@ -69,6 +103,9 @@ public struct WebsiteProbeResult: Identifiable, Sendable {
     public let statusCode: Int?
     public let milliseconds: Int?
     public let date: Date
+    public init(id: String, host: String, state: WebsiteProbeState, statusCode: Int? = nil, milliseconds: Int? = nil, date: Date = Date()) {
+        self.id = id; self.host = host; self.state = state; self.statusCode = statusCode; self.milliseconds = milliseconds; self.date = date
+    }
     public var label: String {
         switch state {
         case .available: return milliseconds.map { "\($0) ms" } ?? "可达"

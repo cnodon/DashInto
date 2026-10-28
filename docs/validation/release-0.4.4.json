@@ -1,0 +1,53 @@
+{
+  "app": "DashInto",
+  "version": "0.4.4",
+  "build": 8,
+  "date": "2026-10-28",
+  "unitTests": {
+    "configuration": "Release",
+    "passed": 48,
+    "failed": 0
+  },
+  "simulatorUITests": {
+    "passed": 5,
+    "failed": 0,
+    "physicalOnlySkipped": 2
+  },
+  "releaseBuild": "passed",
+  "appAndExtensionSigning": "passed",
+  "manualVisualQA": [
+    "light",
+    "dark",
+    "accessibility-large"
+  ],
+  "designPreview": {
+    "data": "synthetic_and_explicitly_labelled",
+    "scope": "DEBUG simulator only with isolated UI-test-library UUID",
+    "reusesProductionDataViews": true,
+    "changesVPNState": false,
+    "releaseEntryAbsentVerified": true
+  },
+  "physicalDeviceActions": "install_and_launch_only_explicitly_authorized",
+  "physicalInstallation": {
+    "date": "2026-10-28",
+    "device": "PKR",
+    "model": "iPhone 15 Pro Max",
+    "method": "in_place_update",
+    "result": "passed",
+    "launch": "passed",
+    "installedVersion": "0.4.4 (8)",
+    "versionEvidence": ".build/install-044-version.json",
+    "installEvidence": ".build/install-044-result.json",
+    "launchEvidence": ".build/install-044-launch.json"
+  },
+  "lastPhysicalInstalledVersion": "0.4.4 (8)",
+  "physicalBatchValidation": "incomplete_previous_run",
+  "evidence": {
+    "unit": ".build/visual-044-release-unit.log",
+    "ui": ".build/visual-044-ui-final.log",
+    "release": ".build/visual-044-release-final-build.log",
+    "signing": ".build/visual-044-signing-final.json"
+  },
+  "sourceRepository": "https://github.com/cnodon/DashInto",
+  "sourceBranch": "main"
+}

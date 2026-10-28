@@ -9,44 +9,13 @@ struct ProfilesView: View {
             if !model.library.profiles.isEmpty {
                 Section {
                     ForEach(model.library.profiles) { profile in
-                        VStack(alignment: .leading, spacing: 8) {
-                            NavigationLink { ProfileDetailView(profileID: profile.id) } label: {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    HStack {
-                                        Text(profile.name).font(.headline).lineLimit(2)
-                                        Spacer()
-                                        if profile.id == model.library.selectedProfileID {
-                                            Text(model.runningProfile?.id == profile.id ? "正在使用" : "下次使用").font(.caption2).foregroundStyle(Color.dashBlue)
-                                        }
-                                    }
-                                    Text(profile.current?.summary.routeCountText ?? "已保存").font(.caption).foregroundStyle(.secondary)
-                                }
-                            }.accessibilityIdentifier("profileDetail-" + profile.name)
-                            if let balance = SubscriptionBalance(usage: profile.usage) {
-                                ProgressView(value: balance.fraction).tint(balance.fraction < 0.1 ? .orange : .dashBlue)
-                                Text("剩余 " + DashFormat.bytes(balance.remaining) + " / " + DashFormat.bytes(balance.total)).font(.caption).foregroundStyle(.secondary)
-                            }
-                            HStack {
-                                VStack(alignment: .leading, spacing: 3) {
-                                    Text(profile.updatedAt, format: .dateTime.month().day().hour().minute())
-                                    if let expiry = profile.usage?.expiresAt {
-                                        Text(expiry < Date() ? "已到期" : "到期 " + expiry.formatted(.dateTime.month().day()))
-                                    }
-                                }.font(.caption2).foregroundStyle(.secondary)
-                                Spacer()
-                                if model.refreshingProfileID == profile.id { ProgressView() }
-                                Button(model.tunnel.phase == .stopped ? "使用并连接" : "切换并重连") { model.useAndConnect(profile) }
-                                    .font(.subheadline).buttonStyle(.borderless).frame(minHeight: 44)
-                                    .disabled(model.connection.step.inProgress || model.busy)
-                                    .accessibilityIdentifier("useProfile-" + profile.name)
-                            }
-                        }.padding(.vertical, 2)
+                        SubscriptionListRow(profile: profile)
                     }
                 }
             }
         }.overlay {
             if model.library.profiles.isEmpty {
-                ContentUnavailableView("暂无订阅", systemImage: "rectangle.stack", description: Text("点右上角 + 添加你的订阅"))
+                ContentUnavailableView("暂无订阅", systemImage: "rectangle.stack", description: Text("右上角 + 添加"))
             }
         }.contentMargins(.top, 8, for: .scrollContent).listSectionSpacing(.compact)
             .navigationTitle("").navigationBarTitleDisplayMode(.inline).accessibilityIdentifier("profilesPage")
@@ -57,23 +26,67 @@ struct ProfilesView: View {
     }
 }
 
+private struct SubscriptionListRow: View {
+    @Environment(AppModel.self) private var model
+    var profile: Profile
+    private var running: Bool { model.tunnel.state == .connected && model.runningProfile?.id == profile.id }
+    private var updatePending: Bool { running && model.hasPendingUpdate }
+    var body: some View {
+        HStack(spacing: 12) {
+            NavigationLink { ProfileDetailView(profileID: profile.id) } label: {
+                HStack(spacing: 12) {
+                    if let balance = SubscriptionBalance(usage: profile.usage) { DashQuotaRing(fraction: balance.fraction, size: 48) }
+                    else { DashGlyph(symbol: "rectangle.stack") }
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack(spacing: 5) {
+                            Text(profile.name).font(.subheadline.weight(.semibold)).lineLimit(2)
+                            if running || model.library.selectedProfileID == profile.id {
+                                Image(systemName: running ? "checkmark.circle.fill" : "checkmark.circle")
+                                    .font(.caption).foregroundStyle(running ? Color.green : Color.dashBlue)
+                                    .accessibilityLabel(running ? "正在使用" : "下次使用")
+                            }
+                        }
+                        if let balance = SubscriptionBalance(usage: profile.usage) {
+                            Text(DashFormat.bytes(balance.remaining) + " 剩余").font(.caption).monospacedDigit().foregroundStyle(.secondary)
+                        } else { Text(profile.current?.summary.routeCountText ?? "已保存").font(.caption).foregroundStyle(.secondary) }
+                        HStack(spacing: 8) {
+                            Label { Text(profile.updatedAt, style: .relative) } icon: { Image(systemName: "arrow.clockwise") }
+                            if let expiry = profile.usage?.expiresAt {
+                                Label { if expiry < Date() { Text("已到期") } else { Text(expiry, format: .dateTime.month().day()) } } icon: { Image(systemName: "calendar") }
+                                    .foregroundStyle(expiry < Date() ? Color.orange : Color.secondary)
+                            }
+                        }.font(.caption2).foregroundStyle(.tertiary)
+                    }
+                }.padding(.vertical, 6)
+            }.accessibilityIdentifier("profileDetail-" + profile.name)
+            Button { model.useAndConnect(profile) } label: {
+                Group {
+                    if model.refreshingProfileID == profile.id || model.connection.targetID == profile.id && model.connection.step.inProgress { ProgressView().controlSize(.small) }
+                    else { Image(systemName: updatePending ? "arrow.clockwise" : running ? "checkmark" : "paperplane.fill") }
+                }.font(.subheadline).frame(width: 44, height: 44)
+                    .background((running ? Color.green : Color.dashBlue).opacity(0.08), in: Circle())
+            }.buttonStyle(.borderless).disabled(model.connection.step.inProgress || model.busy || (running && !updatePending))
+                .accessibilityLabel(updatePending ? "应用并重连" : running ? "正在使用" : "使用并连接")
+                .accessibilityIdentifier("useProfile-" + profile.name)
+        }
+    }
+}
+
 struct ProfileDetailView: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
     var profileID: UUID
     @State private var showingDelete = false
+    @State private var showingRename = false
+    @State private var newName = ""
     private var profile: Profile? { model.library.profiles.first { $0.id == profileID } }
     var body: some View {
         List {
             if let profile {
                 Section {
-                    LabeledContent("来源", value: profile.isSubscription ? profile.sourceHost ?? "订阅" : "本地文件")
-                    LabeledContent("识别格式", value: profile.current?.summary.sourceFormat ?? "Clash / mihomo")
-                    LabeledContent("线路", value: profile.current?.summary.routeCountText ?? "已保存")
-                    LabeledContent("代理组", value: "\(profile.current?.summary.groups.count ?? 0)")
-                    LabeledContent("规则", value: "\(profile.current?.summary.rules.count ?? 0)")
-                    LabeledContent("远程资源", value: "\(profile.current?.summary.providerCount ?? 0)")
-                    if let expiry = profile.usage?.expiresAt { LabeledContent("来源提供的到期时间") { Text(expiry, style: .date) } }
+                    SubscriptionBalanceView(profile: profile)
+                    LabeledContent("节点", value: profile.current?.summary.routeCountText ?? "已保存")
+                    LabeledContent("更新时间") { Text(profile.updatedAt, format: .dateTime.month().day().hour().minute()) }
                 }
                 Section {
                     Button(model.tunnel.phase == .stopped ? "使用并连接" : "切换并重连") { model.useAndConnect(profile) }
@@ -85,50 +98,22 @@ struct ProfileDetailView: View {
                             HStack { Text("更新订阅"); Spacer(); if model.refreshingProfileID == profile.id { ProgressView() } }
                         }.disabled(model.refreshingProfileID != nil || model.busy || model.connection.step.inProgress)
                     }
-                    NavigationLink("查看原始配置") { ConfigurationTextView(profile: profile) }
-                } footer: { Text("运行中的版本不会被下载更新替换；重新连接后应用新配置。") }
-                Section("兼容性提示") {
-                    ForEach(profile.current?.summary.warnings ?? [], id: \.self) { warning in
-                        Label(warning, systemImage: "info.circle").font(.subheadline).foregroundStyle(.secondary)
-                    }
-                }
-                Section("版本历史") {
-                    ForEach(profile.versions) { version in
-                        HStack {
-                            VStack(alignment: .leading, spacing: 5) {
-                                Text(version.createdAt, format: .dateTime.month().day().hour().minute())
-                                Text("\(version.summary.nodes.count) 节点 · \(version.summary.rules.count) 规则").font(.caption).foregroundStyle(.secondary)
-                            }
-                            Spacer()
-                            if version.id == profile.selectedVersion { Image(systemName: "checkmark").foregroundStyle(Color.dashBlue).accessibilityLabel("所选版本") }
-                            else { Button("恢复") { Task { await model.rollback(profile, version: version) } }.buttonStyle(.borderless).disabled(model.busy) }
-                        }
-                    }
+                } footer: { Text("更新后重连生效") }
+                Section {
+                    Button("重命名") { newName = profile.name; showingRename = true }.disabled(model.busy || model.connection.step.inProgress)
                 }
                 Section { Button("删除订阅", role: .destructive) { showingDelete = true }.disabled(model.busy || model.connection.step.inProgress) }
             }
         }.navigationTitle(profile?.name ?? "配置详情").navigationBarTitleDisplayMode(.inline)
+            .alert("订阅名称", isPresented: $showingRename) {
+                TextField("订阅名称", text: $newName).accessibilityIdentifier("renameProfileName")
+                Button("取消", role: .cancel) {}
+                Button("保存") { if let profile { Task { await model.rename(profile, name: newName) } } }
+                    .disabled(newName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
             .confirmationDialog("删除这份配置？", isPresented: $showingDelete, titleVisibility: .visible) {
                 Button("删除配置", role: .destructive) { if let profile { Task { await model.delete(profile); dismiss() } } }
             } message: { Text(model.activeProfile?.id == profileID && model.tunnel.state.isActive ? "当前连接将断开，配置及其历史版本会从本机删除。" : "配置及其历史版本会从本机删除。") }
-    }
-}
-
-struct ConfigurationTextView: View {
-    @Environment(AppModel.self) private var model
-    var profile: Profile
-    @State private var text = ""
-    @State private var error: String?
-    var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                Label("此内容可能包含节点密码和订阅凭据，请谨慎分享。", systemImage: "lock.shield").font(.subheadline).foregroundStyle(.secondary)
-                Text(error ?? text).font(.system(.footnote, design: .monospaced)).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
-            }.padding(20)
-        }.navigationTitle("原始配置").task {
-            do { text = try await model.store.envelope(profileID: profile.id, generation: profile.selectedVersion).original }
-            catch { self.error = error.localizedDescription }
-        }
     }
 }
 
@@ -138,6 +123,7 @@ struct ImportView: View {
     var initialURL: String = ""
     @State private var address = ""
     @State private var name = ""
+    @State private var generatedName = "我的订阅"
     @State private var prepared: PreparedConfiguration?
     @State private var sourceURL: URL?
     @State private var usage: SubscriptionUsage?
@@ -151,6 +137,9 @@ struct ImportView: View {
     var body: some View {
         NavigationStack {
             Form {
+                Section("订阅名称") {
+                    TextField("留空自动命名", text: $name).accessibilityIdentifier("profileName").disabled(saving)
+                }
                 if loading { Section { HStack { ProgressView(); Text(stage).font(.subheadline) } } }
                 if prepared == nil {
                     Section {
@@ -176,7 +165,6 @@ struct ImportView: View {
                         Button("从配置文件导入", systemImage: "doc.badge.plus") { filePicker = true }.disabled(loading)
                     } footer: { Text("支持常见分享链接、Base64 节点订阅和部分客户端节点配置；不支持的记录会在保存前提示。") }
                 } else if let prepared {
-                    Section("配置名称") { TextField("我的订阅", text: $name).accessibilityIdentifier("profileName") }
                     Section("已准备好连接") {
                         Label(prepared.summary.routeCountText, systemImage: "network")
                         Text(prepared.summary.isDirectOnly ? "此配置只直接连接，不提供代理线路。" : "将使用订阅默认选择。可以直接连接，也可以稍后在线路页调整。")
@@ -209,9 +197,9 @@ struct ImportView: View {
                     if prepared != nil {
                         VStack(spacing: 8) {
                             DashPrimaryButton(title: saving ? "正在保存" : model.tunnel.phase == .stopped ? "使用并连接" : "切换并重连") { save(connect: true) }
-                                .disabled(saving || model.busy || model.connection.step.inProgress || name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                                .disabled(saving || model.busy || model.connection.step.inProgress)
                                 .accessibilityIdentifier("useAndConnect")
-                            Button("仅保存") { save(connect: false) }.frame(minHeight: 44).disabled(saving || name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                            Button("仅保存") { save(connect: false) }.frame(minHeight: 44).disabled(saving)
                                 .accessibilityIdentifier("saveProfile")
                             Text(model.tunnel.phase == .stopped ? "仅保存不会选中或连接这份订阅。" : "切换会短暂中断连接；仅保存会保留当前连接。")
                                 .font(.caption).foregroundStyle(.secondary)
@@ -254,7 +242,7 @@ struct ImportView: View {
                 let result = try await NativeResourcePreparer.shared.prepare(parsed) { value in await MainActor.run { stage = value } }
                 try Task.checkCancellation()
                 prepared = result; sourceURL = url; usage = download.usage
-                name = download.suggestedName.flatMap { $0.isEmpty ? nil : $0 } ?? "我的订阅"
+                applySuggestedName(download.suggestedName, url: url, fallback: "我的订阅")
             } catch is CancellationError {} catch { self.error = error.localizedDescription }
         }
     }
@@ -267,9 +255,16 @@ struct ImportView: View {
                 let parsed = try await Task.detached { try NativeConfigImporter.prepare(text) }.value
                 try Task.checkCancellation()
                 let result = try await NativeResourcePreparer.shared.prepare(parsed) { value in await MainActor.run { stage = value } }
-                try Task.checkCancellation(); prepared = result; name = proposedName; sourceURL = nil; usage = nil
+                try Task.checkCancellation(); prepared = result; sourceURL = nil; usage = nil
+                applySuggestedName(proposedName, url: nil, fallback: "我的节点")
             } catch is CancellationError {} catch { self.error = error.localizedDescription }
         }
+    }
+    private func applySuggestedName(_ suggestion: String?, url: URL?, fallback: String) {
+        let automatic = SubscriptionNaming.resolve(suggested: suggestion, sourceURL: url, fallback: fallback,
+                                                   existing: model.library.profiles.map(\.name))
+        if name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || name == generatedName { name = automatic }
+        generatedName = automatic
     }
     private func save(connect: Bool) {
         guard let prepared, !saving else { return }
@@ -277,7 +272,7 @@ struct ImportView: View {
         work = Task {
             defer { saving = false }
             do {
-                let commit = try await model.save(prepared, name: name.trimmingCharacters(in: .whitespacesAndNewlines), url: sourceURL, usage: usage)
+                let commit = try await model.save(prepared, name: SubscriptionNaming.resolve(input: name, suggested: generatedName), url: sourceURL, usage: usage)
                 if connect, let exact = commit.library.profiles.first(where: { $0.id == commit.profileID && $0.selectedVersion == commit.generation }) {
                     model.useAndConnect(exact)
                 } else { model.selectedTab = .subscriptions; model.notice = "订阅已保存。可在列表中使用并连接。" }

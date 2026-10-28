@@ -6,9 +6,13 @@ final class ClashDashUITests: XCTestCase {
         app.launchArguments = ["--ui-test-library=" + UUID().uuidString]
         app.launch(); return app
     }
-    private func preview(_ app: XCUIApplication, name: String, nodes: Int = 1) {
+    private func preview(_ app: XCUIApplication, name: String, nodes: Int = 1, entryName: String? = nil) {
         app.tabBars.buttons["订阅"].tap()
         app.buttons["添加订阅"].firstMatch.tap()
+        if let entryName {
+            let early = app.textFields["profileName"]
+            early.tap(); early.typeText(entryName + "\n")
+        }
         app.buttons["粘贴节点或配置"].tap()
         let editor = app.textViews["nodeContent"]
         XCTAssertTrue(editor.waitForExistence(timeout: 5)); editor.tap()
@@ -17,6 +21,7 @@ final class ClashDashUITests: XCTestCase {
         app.buttons["readPastedContent"].tap()
         let field = app.textFields["profileName"]
         XCTAssertTrue(field.waitForExistence(timeout: 20))
+        if let entryName { XCTAssertEqual(field.value as? String, entryName) }
         field.tap(); field.press(forDuration: 1.1)
         if app.menuItems["全选"].waitForExistence(timeout: 1) { app.menuItems["全选"].tap() }
         else { field.tap(withNumberOfTaps: 3, numberOfTouches: 1) }
@@ -25,6 +30,16 @@ final class ClashDashUITests: XCTestCase {
         field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: old.count) + name + "\n")
         XCTAssertTrue(app.buttons["useAndConnect"].isHittable)
         XCTAssertTrue(app.buttons["saveProfile"].isHittable)
+    }
+    func testReadOnlyDashboardDesignPreview() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-test-library=" + UUID().uuidString, "--ui-test-dashboard-preview"]
+        app.launch()
+        XCTAssertTrue(app.staticTexts["界面预览 · 示例数据"].waitForExistence(timeout: 8))
+        XCTAssertTrue(app.otherElements["liveTrafficCard"].exists)
+        XCTAssertFalse(app.buttons["connectionButton"].exists)
+        XCTAssertTrue(app.buttons["egressAddress"].exists)
+        let shot = XCTAttachment(screenshot: app.screenshot()); shot.name = "DashboardVisual044"; shot.lifetime = .keepAlways; add(shot)
     }
     func testFiveTabsEmptySubscriptionAndUpdateEntry() {
         let app = launch()
@@ -41,6 +56,9 @@ final class ClashDashUITests: XCTestCase {
         app.tabBars.buttons["本机信息"].tap()
         XCTAssertTrue(app.staticTexts["设备类型"].waitForExistence(timeout: 5))
         app.tabBars.buttons["设置"].tap()
+        XCTAssertFalse(app.staticTexts["Apple SDK"].exists)
+        XCTAssertFalse(app.staticTexts["连接行为"].exists)
+        XCTAssertFalse(app.staticTexts["导入格式与协议"].exists)
         app.buttons["softwareUpdate"].tap()
         XCTAssertTrue(app.buttons["checkAppUpdate"].waitForExistence(timeout: 5))
         XCTAssertEqual(app.textFields["updateRepository"].value as? String, "cnodon/DashInto")
@@ -60,12 +78,29 @@ final class ClashDashUITests: XCTestCase {
         XCTAssertFalse(app.otherElements["liveTrafficCard"].exists)
         XCTAssertFalse(app.buttons["refreshWebsites"].exists)
         XCTAssertTrue(app.buttons["plannedRoute"].exists)
+        XCTAssertTrue(app.buttons["plannedRoute"].label.contains("Route1"))
         app.buttons["plannedRoute"].tap()
-        app.buttons["routeGroup-节点选择"].tap()
-        app.buttons.containing(.staticText, identifier: "Route2").firstMatch.tap()
-        XCTAssertTrue(app.staticTexts["Route2"].firstMatch.waitForExistence(timeout: 3))
+        XCTAssertTrue(app.navigationBars["选择节点"].waitForExistence(timeout: 5))
+        app.buttons["homeSelect-Route2"].tap()
+        XCTAssertTrue(app.buttons["homeMode"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["plannedRoute"].label.contains("Route2"))
+        app.buttons["homeMode"].tap()
+        app.buttons["直连模式"].tap()
+        XCTAssertTrue(app.buttons["plannedRoute"].label.contains("直接连接"))
         app.terminate(); app.launch()
+        XCTAssertTrue(app.buttons["homeMode"].waitForExistence(timeout: 8))
+        XCTAssertTrue(app.buttons["plannedRoute"].label.contains("直接连接"))
+        app.buttons["homeMode"].tap()
+        app.buttons["全局模式"].tap()
+        XCTAssertTrue(app.buttons["plannedRoute"].label.contains("Route1"))
+        app.buttons["homeMode"].tap()
+        app.buttons["规则模式"].tap()
+        XCTAssertTrue(app.buttons["plannedRoute"].label.contains("Route2"))
         app.tabBars.buttons["代理"].tap()
+        XCTAssertTrue(app.buttons["testAllProxies"].waitForExistence(timeout: 8))
+        XCTAssertFalse(app.buttons["testAllProxies"].isEnabled)
+        app.buttons["routeGroup-节点选择"].tap()
+        XCTAssertTrue(app.buttons["testGroupProxies"].exists)
         XCTAssertTrue(app.staticTexts["Route2"].waitForExistence(timeout: 8))
         let selected = XCTAttachment(screenshot: app.screenshot()); selected.name = "OfflineRoute040"; selected.lifetime = .keepAlways; add(selected)
     }
@@ -92,7 +127,7 @@ final class ClashDashUITests: XCTestCase {
     }
     func testFirstSaveOnlyDoesNotSelectAndInvalidURLKeepsInput() {
         let app = launch()
-        preview(app, name: "Saved")
+        preview(app, name: "Saved", entryName: "Travel")
         app.buttons["saveProfile"].tap()
         XCTAssertTrue(app.buttons["saveProfile"].waitForNonExistence(timeout: 8))
         app.tabBars.buttons["首页"].tap()
@@ -116,5 +151,16 @@ final class ClashDashUITests: XCTestCase {
         XCTAssertEqual(field.value as? String, "http://example.com/sub")
         app.buttons["取消"].tap()
         XCTAssertTrue(app.staticTexts["Saved"].waitForExistence(timeout: 5))
+        app.buttons["profileDetail-Saved"].tap()
+        XCTAssertTrue(app.navigationBars["Saved"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.staticTexts["版本历史"].exists)
+        XCTAssertFalse(app.buttons["查看原始配置"].exists)
+        app.buttons["重命名"].tap()
+        let rename = app.alerts.textFields.firstMatch
+        XCTAssertTrue(rename.waitForExistence(timeout: 5))
+        rename.tap()
+        rename.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: (rename.value as? String ?? "").count) + "Renamed")
+        app.alerts.buttons["保存"].tap()
+        XCTAssertTrue(app.navigationBars["Renamed"].waitForExistence(timeout: 5))
     }
 }

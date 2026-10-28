@@ -17,7 +17,8 @@ final class AppModel {
     var busy = false
     var groups: [ProxyGroup] = []
     var delays: [String: Int] = [:]
-    var testingNames: Set<String> = []
+    let delayTests = DelayTestRunner()
+    var testingNames: Set<String> { delayTests.testingNames }
     var traffic: [TrafficSample] = []
     var uploadRate = 0.0
     var downloadRate = 0.0
@@ -34,6 +35,8 @@ final class AppModel {
     @ObservationIgnored private var lastGroupRefresh = Date.distantPast
     @ObservationIgnored private var healthyGeneration: String?
     @ObservationIgnored private var loading = false
+    @ObservationIgnored private var refreshingGroupSession: String?
+    @ObservationIgnored private var groupRefreshToken = UUID()
 
     var activeProfile: Profile? { library.activeProfile }
     var runningProfile: Profile? {
@@ -54,34 +57,42 @@ final class AppModel {
     var mode: RoutingMode { RoutingMode(rawValue: tunnel.runtime?.mode ?? "") ?? displayProfile?.preferredMode ?? .rule }
     var displayGroups: [ProxyGroup] {
         if tunnel.state == .connected { return groups }
-        var result = activeSummary?.groups ?? []
-        if mode == .global {
-            result = [ProxyGroup(name: "GLOBAL", kind: "select", members: ["DIRECT"] + result.map(\.name) + (activeSummary?.nodes.map(\.name) ?? []))]
-        }
-        return result.map { group in
-            var value = group
-            value.selected = displayProfile?.selections?[group.name].flatMap { group.members.contains($0) ? $0 : nil }
-            return value
+        guard let summary = activeSummary else { return [] }
+        let catalog = ProxySelection.configurationGroups(summary: summary) + [ProxySelection.globalGroup(summary: summary)]
+        let selections = ProxySelection.defaultSelections(groups: catalog, saved: displayProfile?.selections ?? [:])
+        return catalog.map { group in
+            var value = group; value.selected = selections[group.name]; return value
         }
     }
     var visibleGroups: [ProxyGroup] { displayGroups.filter { mode == .global ? $0.name == "GLOBAL" : $0.name != "GLOBAL" } }
     var quickGroup: ProxyGroup? { visibleGroups.count == 1 ? visibleGroups.first : nil }
-    var homeGroup: ProxyGroup? {
-        if let name = homeGroupName, let group = visibleGroups.first(where: { $0.name == name }) { return group }
-        let fallback = activeSummary?.rules.last(where: { $0.hasPrefix("MATCH,") })?.split(separator: ",").dropFirst().first.map(String.init)
-        return visibleGroups.first(where: { $0.name == fallback }) ?? visibleGroups.first
+    var homeRouteTarget: String? {
+        if mode == .direct || activeSummary?.isDirectOnly == true { return "DIRECT" }
+        if mode == .global { return "GLOBAL" }
+        if let name = homeGroupName, visibleGroups.contains(where: { $0.name == name }) { return name }
+        return activeSummary?.rules.last(where: { $0.hasPrefix("MATCH,") })?.split(separator: ",").dropFirst().first.map { $0.trimmingCharacters(in: .whitespaces) }
+            ?? visibleGroups.first?.name
     }
+    var homeGroup: ProxyGroup? { visibleGroups.first { $0.name == homeRouteTarget } }
     var homeNode: String? {
-        guard tunnel.runtime != nil, let group = homeGroup else { return nil }
-        return ProxySelection.resolvedLeaf(group: group.name, groups: groups)
+        guard tunnel.runtime != nil, let target = homeRouteTarget else { return nil }
+        if (target == "GLOBAL" || activeSummary?.groups.contains(where: { $0.name == target }) == true), !groups.contains(where: { $0.name == target }) { return nil }
+        return ProxySelection.resolvedLeaf(group: target, groups: groups)
     }
     var plannedHomeRoute: String {
-        if activeSummary?.isDirectOnly == true { return "仅直连，不提供代理线路" }
-        guard let group = homeGroup else { return "沿用订阅默认策略，无需先选节点" }
-        if let leaf = ProxySelection.resolvedLeaf(group: group.name, groups: displayGroups) {
-            return "已选 · " + leaf
-        }
-        return group.isSelectable ? "沿用订阅默认节点 · 可手动更换" : "由订阅自动选择节点"
+        guard let target = homeRouteTarget else { return "连接后读取节点" }
+        return ProxySelection.preview(group: target, groups: displayGroups) ?? "请选择节点"
+    }
+    var homeProxyTitle: String {
+        let name = tunnel.state == .connected ? (homeNode ?? homeGroup?.selected ?? homeRouteTarget ?? "正在读取节点") : plannedHomeRoute
+        return name == "DIRECT" ? "直接连接" : name
+    }
+    var proxyTestNames: [String] {
+        let builtins: Set<String> = ["DIRECT", "REJECT", "REJECT-DROP", "PASS", "COMPATIBLE", "GLOBAL"]
+        let groupNames = Set(displayGroups.map(\.name))
+        var seen = Set<String>()
+        let candidates = (activeSummary?.nodes.map(\.name) ?? []) + proxyKinds.keys.sorted()
+        return candidates.filter { !builtins.contains($0) && !groupNames.contains($0) && seen.insert($0).inserted }
     }
     var canEditRoutes: Bool { !busy && !connection.step.inProgress && (tunnel.phase == .stopped || tunnel.runtime != nil) }
     var routeDescription: String {
@@ -122,12 +133,13 @@ final class AppModel {
         } catch { errorMessage = error.localizedDescription }
     }
     func resume() { tunnel.startPolling { [weak self] in self?.consumeSample() } }
-    func suspend() { tunnel.stopPolling(); dashboard.suspend(); traffic = [] }
+    func suspend() { tunnel.stopPolling(); dashboard.suspend(); delayTests.cancel(); traffic = [] }
     func consumeSample() {
         connection.reconcile()
         dashboard.sample(tunnel)
-        guard let runtime = tunnel.runtime else { groups = []; traffic = []; return }
+        guard let runtime = tunnel.runtime else { groups = []; traffic = []; delayTests.cancel(); return }
         if runtime.sessionID != lastSampleSession {
+            delayTests.cancel()
             lastSampleSession = runtime.sessionID; traffic = []; groups = []; delays = [:]; delayDates = [:]
             uploaded = 0; downloaded = 0; lastGroupRefresh = .distantPast
         }
@@ -142,12 +154,12 @@ final class AppModel {
             healthyGeneration = runtime.generation
             Task { try? await store.markGood(profileID: profile.id, generation: runtime.generation) }
         }
-        if Date().timeIntervalSince(lastGroupRefresh) >= 5 {
+        if Date().timeIntervalSince(lastGroupRefresh) >= 2 {
             lastGroupRefresh = Date(); Task { await refreshGroups() }
         }
     }
     func toggleConnection() async {
-        if connection.step.inProgress || tunnel.phase != .stopped { connection.cancel(); return }
+        if connection.step.inProgress || tunnel.phase != .stopped { delayTests.cancel(); connection.cancel(); return }
         guard let profile = activeProfile else {
             if library.profiles.isEmpty { showingImport = true } else { selectedTab = .subscriptions }
             return
@@ -156,26 +168,35 @@ final class AppModel {
     }
     @discardableResult
     func save(_ prepared: PreparedConfiguration, name: String, url: URL?, usage: SubscriptionUsage?) async throws -> ImportCommit {
-        let commit = try await store.commitImport(prepared, name: name, sourceURL: url, usage: usage)
+        let title = SubscriptionNaming.resolve(input: name, sourceURL: url, existing: library.profiles.map(\.name))
+        let commit = try await store.commitImport(prepared, name: title, sourceURL: url, usage: usage)
         library = commit.library
         return commit
     }
     func useAndConnect(_ profile: Profile) {
         guard !connection.step.inProgress, !busy else { return }
+        delayTests.cancel(); homeGroupName = nil
         selectedTab = .home; notice = nil
         connection.start(profile) { [weak self] in
             guard let self else { throw CancellationError() }
             try Task.checkCancellation()
             self.library = try await self.store.select(profile.id)
-            self.groups = []; self.delays = [:]; self.traffic = []; self.healthyGeneration = nil
+            self.groups = []; self.delays = [:]; self.proxyKinds = [:]; self.traffic = []; self.healthyGeneration = nil
         }
     }
     func activate(_ profile: Profile) async {
         if tunnel.phase != .stopped { useAndConnect(profile); return }
         await perform {
             self.library = try await self.store.select(profile.id)
-            self.groups = []; self.delays = [:]; self.traffic = []
+            self.groups = []; self.delays = [:]; self.traffic = []; self.homeGroupName = nil; self.proxyKinds = [:]
             self.selectedTab = .home
+        }
+    }
+    func rename(_ profile: Profile, name: String) async {
+        await perform {
+            let title = SubscriptionNaming.resolve(input: name, fallback: profile.name,
+                existing: self.library.profiles.filter { $0.id != profile.id }.map(\.name))
+            self.library = try await self.store.rename(profileID: profile.id, name: title)
         }
     }
     func delete(_ profile: Profile) async {
@@ -205,11 +226,13 @@ final class AppModel {
             self.notice = "已恢复所选版本。"
         }
     }
-    func refreshGroups() async {
-        guard tunnel.state == .connected, let session = tunnel.runtime?.sessionID else { return }
+    func refreshGroups(force: Bool = false) async {
+        guard tunnel.state == .connected, let session = tunnel.runtime?.sessionID, force || refreshingGroupSession != session else { return }
+        refreshingGroupSession = session; groupRefreshToken = UUID(); let token = groupRefreshToken
+        defer { if groupRefreshToken == token { refreshingGroupSession = nil } }
         do {
             let data = try await tunnel.request("proxies")
-            guard tunnel.runtime?.sessionID == session else { return }
+            guard tunnel.runtime?.sessionID == session, groupRefreshToken == token else { return }
             let root = try JSONSerialization.jsonObject(with: data) as? [String: Any] ?? [:]
             let catalog = root["proxies"] as? [String: [String: Any]] ?? [:]
             proxyKinds = catalog.compactMapValues { $0["all"] == nil ? $0["type"] as? String : nil }
@@ -233,7 +256,7 @@ final class AppModel {
             if self.tunnel.state == .connected {
                 let session = self.tunnel.runtime?.sessionID
                 _ = try await self.tunnel.request("select", parameters: ["group": group.name, "name": member])
-                await self.refreshGroups()
+                await self.refreshGroups(force: true)
                 guard self.tunnel.runtime?.sessionID == session,
                       self.groups.first(where: { $0.name == group.name })?.selected == member else {
                     throw DashError.message("线路切换尚未确认，请刷新后重试。")
@@ -241,18 +264,24 @@ final class AppModel {
             }
             self.library = try await self.store.rememberSelection(profileID: profile.id, group: group.name, member: member)
             self.dashboard.invalidateNetwork()
+            self.dashboard.refreshNetwork(self.tunnel)
             self.notice = self.tunnel.state == .connected ? "线路已切换，影响新连接。" : "已保存，下次连接使用。"
         }
     }
-    func testDelay(_ name: String) async {
-        guard !testingNames.contains(name), testingNames.count < 3 else { return }
-        testingNames.insert(name); defer { testingNames.remove(name) }
-        do {
-            let data = try await tunnel.request("delay", parameters: ["name": name])
+    func testDelay(_ name: String) async { startDelayTests([name]) }
+    func startDelayTests(_ names: [String]) {
+        guard tunnel.state == .connected, let session = tunnel.runtime?.sessionID else { return }
+        let profile = runningProfile?.id
+        delayTests.start(names: names, isCurrent: { [weak self] in
+            self?.tunnel.state == .connected && self?.tunnel.runtime?.sessionID == session && self?.runningProfile?.id == profile
+        }, test: { [weak self] name in
+            guard let self, self.tunnel.runtime?.sessionID == session else { throw CancellationError() }
+            let data = try await self.tunnel.request("delay", parameters: ["name": name])
             let root = try JSONSerialization.jsonObject(with: data) as? [String: Any] ?? [:]
-            delays[name] = (root["delay"] as? NSNumber)?.intValue ?? -1
-        } catch { delays[name] = -1 }
-        delayDates[name] = Date()
+            return (root["delay"] as? NSNumber)?.intValue ?? -2
+        }, receive: { [weak self] name, delay in
+            self?.delays[name] = delay; self?.delayDates[name] = Date()
+        })
     }
     func setMode(_ mode: RoutingMode) async {
         guard canEditRoutes, let profile = displayProfile else { return }
@@ -266,7 +295,9 @@ final class AppModel {
                 }
             }
             self.library = try await self.store.rememberMode(profileID: profile.id, mode: mode)
+            await self.refreshGroups(force: true)
             self.dashboard.invalidateNetwork()
+            self.dashboard.refreshNetwork(self.tunnel)
         }
     }
     func perform(_ operation: @MainActor () async throws -> Void) async {

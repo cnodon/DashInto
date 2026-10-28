@@ -58,6 +58,10 @@ print("MEMORY_BYTES", ClashMemoryFootprint())
 print("TRAFFIC", ClashTrafficJSON())
 try core.setMode("global")
 guard core.mode() == "global" else { fatalError("Mode change was not committed") }
+try core.setMode("direct")
+guard core.mode() == "direct" else { fatalError("Direct mode was not committed") }
 try core.setMode("rule")
+guard core.mode() == "rule" else { fatalError("Rule mode was not restored") }
+print("MODES_VERIFIED", "global,direct,rule")
 try core.close()
 guard delay >= 0, tcpOnly || dns.contains("203.0.113.7") else { exit(1) }

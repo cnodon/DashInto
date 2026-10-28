@@ -219,6 +219,13 @@ public actor ProfileStore {
         guard let index = state.profiles.firstIndex(where: { $0.id == profileID }) else { throw DashError.message("找不到配置。") }
         state.profiles[index].preferredMode = mode; try saveLibrary(state); return state
     }
+    public func rename(profileID: UUID, name: String) throws -> ProfileLibrary {
+        var state = try library()
+        guard let index = state.profiles.firstIndex(where: { $0.id == profileID }) else { throw DashError.message("找不到订阅。") }
+        state.profiles[index].name = SubscriptionNaming.resolve(input: name, fallback: state.profiles[index].name,
+            existing: state.profiles.filter { $0.id != profileID }.map(\.name))
+        try saveLibrary(state); return state
+    }
     public func delete(_ id: UUID) throws -> ProfileLibrary {
         var state = try library(); state.profiles.removeAll { $0.id == id }
         if state.selectedProfileID == id { state.selectedProfileID = state.profiles.first?.id }

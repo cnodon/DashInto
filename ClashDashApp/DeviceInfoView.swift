@@ -6,6 +6,7 @@ import ClashDashKit
 @Observable @MainActor
 final class DeviceNetworkInfo {
     var network = "正在读取"
+    var online = false
     var ipv4 = false
     var ipv6 = false
     var constrained = false
@@ -18,7 +19,7 @@ final class DeviceNetworkInfo {
             let name = path.status != .satisfied ? "无可用网络" : path.usesInterfaceType(.wifi) ? "Wi-Fi" : path.usesInterfaceType(.cellular) ? "蜂窝网络" : path.usesInterfaceType(.wiredEthernet) ? "有线网络" : "其他接口"
             Task { @MainActor [weak self] in
                 guard let self, self.monitor != nil else { return }
-                self.network = name; self.ipv4 = path.supportsIPv4; self.ipv6 = path.supportsIPv6
+                self.network = name; self.online = path.status == .satisfied; self.ipv4 = path.supportsIPv4; self.ipv6 = path.supportsIPv6
                 self.constrained = path.isConstrained; self.addresses = Self.localAddresses()
             }
         }
@@ -50,26 +51,51 @@ struct DeviceInfoView: View {
     @State private var network = DeviceNetworkInfo()
     var body: some View {
         List {
+            Section {
+                HStack(spacing: 12) {
+                    DashGlyph(symbol: network.network == "Wi-Fi" ? "wifi" : network.network == "蜂窝网络" ? "antenna.radiowaves.left.and.right" : "network", color: network.online ? .dashBlue : .secondary)
+                    VStack(alignment: .leading, spacing: 7) {
+                        Text(network.network).font(.headline)
+                        HStack(spacing: 8) {
+                            Label("IPv4", systemImage: network.ipv4 ? "checkmark.circle.fill" : "minus.circle")
+                                .foregroundStyle(network.ipv4 ? Color.green : Color.secondary)
+                            Label("IPv6", systemImage: network.ipv6 ? "checkmark.circle.fill" : "minus.circle")
+                                .foregroundStyle(network.ipv6 ? Color.green : Color.secondary)
+                            if network.constrained { Image(systemName: "leaf").accessibilityLabel("低数据模式") }
+                        }.font(.caption2)
+                    }
+                }.padding(.vertical, 5)
+                if !network.addresses.isEmpty {
+                    DisclosureGroup("本机地址") {
+                        ForEach(Array(network.addresses.enumerated()), id: \.offset) { _, item in
+                            VStack(alignment: .leading, spacing: 3) { Text(item.0).font(.caption2).foregroundStyle(.secondary); Text(item.1).font(.caption).monospaced().textSelection(.enabled) }
+                        }
+                    }.font(.subheadline)
+                }
+            }
             Section("设备") {
                 LabeledContent("设备类型", value: UIDevice.current.model)
                 LabeledContent("系统", value: UIDevice.current.systemName + " " + UIDevice.current.systemVersion)
-                LabeledContent("DashInto", value: DashConstants.appVersion)
             }
-            Section("接入网络") {
-                LabeledContent("网络类型", value: network.network)
-                LabeledContent("IP 支持", value: [network.ipv4 ? "IPv4" : nil, network.ipv6 ? "IPv6" : nil].compactMap { $0 }.joined(separator: " / "))
-                LabeledContent("低数据模式", value: network.constrained ? "已开启" : "未开启")
-                ForEach(Array(network.addresses.enumerated()), id: \.offset) { _, item in
-                    VStack(alignment: .leading, spacing: 3) { Text(item.0).font(.caption).foregroundStyle(.secondary); Text(item.1).font(.subheadline).textSelection(.enabled) }
-                }
-            }
-            Section("VPN 与核心") {
-                LabeledContent("系统 VPN", value: model.tunnel.state.title)
-                LabeledContent("核心", value: model.tunnel.runtime?.coreVersion ?? "未运行")
-                LabeledContent("核心内存", value: model.tunnel.runtime.map { DashFormat.bytes(Double($0.memoryBytes)) } ?? "—")
-                LabeledContent("当前订阅", value: model.displayProfile?.name ?? "未选择")
-                LabeledContent("规则数", value: model.activeSummary.map { String($0.rules.count) } ?? "—")
-                NavigationLink { ConnectionsView().toolbar(.visible, for: .navigationBar) } label: { Label("当前连接", systemImage: "network") }
+            Section {
+                HStack {
+                    Label(model.tunnel.state.title, systemImage: "shield.lefthalf.filled").foregroundStyle(model.tunnel.state == .connected ? Color.green : Color.secondary)
+                    Spacer()
+                    if let runtime = model.tunnel.runtime { Text(runtime.coreVersion).foregroundStyle(.tertiary) }
+                }.font(.caption)
+                HStack(spacing: 20) {
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text(model.tunnel.runtime.map { DashFormat.bytes(Double($0.memoryBytes)) } ?? "—")
+                            .font(.system(.title3, design: .rounded, weight: .semibold)).monospacedDigit()
+                        Label("核心内存", systemImage: "memorychip").font(.caption2).foregroundStyle(.secondary)
+                    }.frame(maxWidth: .infinity, alignment: .leading)
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text(model.activeSummary.map { String($0.rules.count) } ?? "—")
+                            .font(.system(.title3, design: .rounded, weight: .semibold)).monospacedDigit()
+                        Label("规则", systemImage: "arrow.triangle.branch").font(.caption2).foregroundStyle(.secondary)
+                    }.frame(maxWidth: .infinity, alignment: .leading)
+                }.padding(.vertical, 6)
+                NavigationLink { ConnectionsView().toolbar(.visible, for: .navigationBar) } label: { Label("活动连接", systemImage: "point.3.connected.trianglepath.dotted") }
                 NavigationLink { DiagnosticsView().toolbar(.visible, for: .navigationBar) } label: { Label("运行诊断", systemImage: "stethoscope") }
             }
         }.listSectionSpacing(.compact).contentMargins(.top, 8, for: .scrollContent)

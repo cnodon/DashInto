@@ -33,7 +33,7 @@ enum NativeConfigImporter {
         } else {
             guard !nodes.isEmpty else {
                 let types = Set(skipped.compactMap { $0["scheme"] as? String }).sorted().joined(separator: "、")
-                throw DashError.message(types.isEmpty ? "没有找到可导入的节点。" : "没有找到可用节点。当前内容涉及的类型：\(types)。请在“导入格式与协议”查看支持范围。")
+                throw DashError.message(types.isEmpty ? "没有找到可导入的节点。" : "没有找到可用节点。当前内容涉及的类型：\(types)。请使用 Clash/mihomo 格式或常见节点分享链接。")
             }
             let names = nodes.compactMap { $0["name"] as? String }
             var group = "节点选择"

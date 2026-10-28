@@ -11,14 +11,10 @@ struct SettingsView: View {
                     HStack { Label("软件更新", systemImage: "arrow.down.circle"); Spacer(); if model.updates.hasUpdate { Text("新版本").font(.caption).foregroundStyle(Color.dashBlue) } }
                 }.accessibilityIdentifier("softwareUpdate")
             }
-            Section("外观") {
-                Picker("外观模式", selection: $appearance) {
+            Section {
+                Picker(selection: $appearance) {
                     Text("跟随系统").tag("system"); Text("浅色").tag("light"); Text("深色").tag("dark")
-                }
-            }
-            Section("连接与排障") {
-                NavigationLink { ConnectionHelpView().toolbar(.visible, for: .navigationBar) } label: { Label("连接行为", systemImage: "switch.2") }
-                NavigationLink { ImportSupportView().toolbar(.visible, for: .navigationBar) } label: { Label("导入格式与协议", systemImage: "arrow.down.doc") }
+                } label: { Label("外观", systemImage: "circle.lefthalf.filled") }
             }
             Section("隐私与数据") {
                 NavigationLink { PrivacyView().toolbar(.visible, for: .navigationBar) } label: { Label("数据与隐私", systemImage: "hand.raised") }
@@ -26,44 +22,9 @@ struct SettingsView: View {
             }
             Section {
                 LabeledContent("App 版本", value: DashConstants.appVersion)
-                LabeledContent("核心", value: "mihomo 1.19.33")
-                LabeledContent("Apple SDK", value: "Clash .3")
-            } footer: { Text("个人开发版本 · 配置由你提供，运行状态以系统与核心回执为准。") }
+
+            }
         }.listSectionSpacing(.compact).contentMargins(.top, 8, for: .scrollContent).toolbar(.hidden, for: .navigationBar).accessibilityIdentifier("settingsPage")
-    }
-}
-
-struct ImportSupportView: View {
-    var body: some View {
-        List {
-            Section("完整配置") {
-                Text("Clash / mihomo YAML 或 JSON：保留节点、策略组、分流规则和 DNS，自动适配 iOS 网络环境。")
-            }
-            Section("节点集合") {
-                Text("支持常见节点分享链接、Base64 节点订阅、Shadowrocket JSON、sing-box / V2Ray 出站节点、SIP008 / SSD、Surge 的 Proxy 节点和 WireGuard INI。")
-                Text("节点集合会生成手动选择策略。原客户端的 DNS、路由、脚本及其他专有设置不会自动迁移，保存前会显示提示。")
-                    .foregroundStyle(.secondary)
-            }
-            Section("可识别的分享链接类型") {
-                ForEach(NativeConfigImporter.supportedSchemes, id: \.self) { scheme in Text(scheme + "://").font(.system(.subheadline, design: .monospaced)) }
-            }
-            Section {
-                Text("Clash 和 Shadowrocket 是客户端或配置格式名称。实际连接使用 Shadowsocks、Trojan、VMess、VLESS、AnyTLS、Hysteria、TUIC 等协议。能够识别格式不保证每个节点都可连接；请在连接后测试延迟与网络可达性。")
-                    .font(.subheadline).foregroundStyle(.secondary)
-            }
-        }.font(.subheadline).navigationTitle("导入格式与协议")
-    }
-}
-
-struct ConnectionHelpView: View {
-    var body: some View {
-        List {
-            Section("连接方式") { Text("使用 iOS 的 VPN 隧道承载网络流量。第一次连接时，系统会请求允许添加 VPN 配置。").font(.subheadline) }
-            Section("自动配置") { Text("订阅中的节点、代理组、分流规则和 DNS 会自动读取。桌面监听端口、TUN 和外部控制器设置由 iOS 运行环境接管。").font(.subheadline) }
-            Section("节点切换") { Text("选择新节点影响之后建立的新连接。已有下载、通话或其他长连接可能继续使用原来的路径。").font(.subheadline) }
-            Section("更新") { Text("更新下载的新版本会保存在本机，重新连接后生效。历史版本可以在配置详情中恢复。").font(.subheadline) }
-            Section("系统边界") { Text("规则与全局模式描述核心的路由策略。系统服务及特定网络流量可能受 iOS 的路由例外影响。当前版本使用手动连接。").font(.subheadline) }
-        }.navigationTitle("连接行为")
     }
 }
 

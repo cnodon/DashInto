@@ -10,6 +10,7 @@ struct ClashDashApp: App {
             RootView().environment(model)
                 .preferredColorScheme(appearance == "dark" ? .dark : appearance == "light" ? .light : nil)
                 .task {
+                    guard !DashboardPresentation.preview else { return }
                     await model.load(); model.resume()
                     Task { await model.updates.check() }
                     #if DEBUG
@@ -17,6 +18,7 @@ struct ClashDashApp: App {
                     #endif
                 }
                 .onChange(of: scenePhase) { _, phase in
+                    guard !DashboardPresentation.preview else { return }
                     if phase == .active { Task { await model.load(); model.resume(); await model.updates.check() } }
                     else if phase == .background { model.suspend(); model.updates.scheduleBackgroundCheck() }
                 }
@@ -35,10 +37,17 @@ struct ClashDashApp: App {
 
 struct RootView: View {
     @Environment(AppModel.self) private var model
+    @ViewBuilder private var home: some View {
+        #if DEBUG && targetEnvironment(simulator)
+        if DashboardPresentation.preview { DashboardDesignPreview() } else { OverviewView() }
+        #else
+        OverviewView()
+        #endif
+    }
     var body: some View {
         @Bindable var model = model
         TabView(selection: $model.selectedTab) {
-            NavigationStack { OverviewView() }.tabItem { Label("首页", systemImage: "waveform.path") }.tag(AppTab.home)
+            NavigationStack { home }.tabItem { Label("首页", systemImage: "waveform.path") }.tag(AppTab.home)
             NavigationStack { ProfilesView() }.tabItem { Label("订阅", systemImage: "rectangle.stack") }.tag(AppTab.subscriptions)
             NavigationStack { PoliciesView() }.tabItem { Label("代理", systemImage: "circle.grid.2x2") }.tag(AppTab.proxies)
             NavigationStack { DeviceInfoView() }.tabItem { Label("本机信息", systemImage: "iphone") }.tag(AppTab.device)
@@ -58,5 +67,17 @@ struct RootView: View {
             }
         }
         .animation(DashMotion.state, value: model.notice != nil)
+    }
+}
+
+private enum DashboardPresentation {
+    static var preview: Bool {
+        #if DEBUG && targetEnvironment(simulator)
+        return CommandLine.arguments.contains("--ui-test-dashboard-preview") && CommandLine.arguments.contains { value in
+            value.hasPrefix("--ui-test-library=") && UUID(uuidString: String(value.dropFirst("--ui-test-library=".count))) != nil
+        }
+        #else
+        return false
+        #endif
     }
 }

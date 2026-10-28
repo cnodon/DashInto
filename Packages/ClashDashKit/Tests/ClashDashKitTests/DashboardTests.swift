@@ -2,6 +2,28 @@ import XCTest
 @testable import ClashDashKit
 
 final class DashboardTests: XCTestCase {
+    func testOfflinePreviewDefaultsManualGroupsButDoesNotInventAutomaticNode() {
+        var groups = [ProxyGroup(name: "Main", kind: "select", members: ["Nested", "Tokyo"]),
+                      ProxyGroup(name: "Nested", kind: "select", members: ["Osaka", "Tokyo"])]
+        XCTAssertEqual(ProxySelection.preview(group: "Main", groups: groups), "Osaka")
+        let defaults = ProxySelection.defaultSelections(groups: groups, saved: ["Nested": "Tokyo", "Main": "removed"])
+        XCTAssertEqual(defaults["Main"], "Nested")
+        XCTAssertEqual(defaults["Nested"], "Tokyo")
+        groups[1] = ProxyGroup(name: "Nested", kind: "url-test", members: ["Osaka", "Tokyo"])
+        XCTAssertEqual(ProxySelection.preview(group: "Main", groups: groups), "Nested · 自动选择")
+        XCTAssertEqual(ProxySelection.preview(group: "DIRECT", groups: groups), "DIRECT")
+        groups[1] = ProxyGroup(name: "Nested", kind: "select", members: ["Main"])
+        XCTAssertNil(ProxySelection.preview(group: "Main", groups: groups))
+    }
+    func testProviderOnlySelectionIsPreservedInPreviewAndStartupDefaults() {
+        let group = ProxyGroup(name: "Provider", kind: "select", members: [], usesProviders: true)
+        let defaults = ProxySelection.defaultSelections(groups: [group], saved: ["Provider": "RemoteTokyo"])
+        XCTAssertEqual(defaults["Provider"], "RemoteTokyo")
+        var preview = group; preview.selected = defaults["Provider"]
+        XCTAssertEqual(ProxySelection.preview(group: "Provider", groups: [preview]), "RemoteTokyo")
+        let legacy = ConfigurationSummary(nodes: [], groups: [ProxyGroup(name: "Legacy", kind: "select", members: [])], rules: [], providerCount: 1, warnings: [])
+        XCTAssertEqual(ProxySelection.defaultSelections(groups: ProxySelection.configurationGroups(summary: legacy), saved: ["Legacy": "Remote"])["Legacy"], "Remote")
+    }
     func testQuotaMissingIsNotZeroAndOveruseClamps() {
         XCTAssertNil(SubscriptionBalance(usage: .parse("total=100; download=20")))
         XCTAssertNil(SubscriptionBalance(usage: .parse("total=0; upload=0; download=0")))

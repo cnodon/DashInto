@@ -19,8 +19,18 @@ public enum DashError: LocalizedError {
 }
 
 public enum RoutingMode: String, Codable, CaseIterable, Sendable {
-    case rule, global
-    public var title: String { self == .rule ? "规则模式" : "全局模式" }
+    case rule, global, direct
+    public var title: String { label + "模式" }
+    public var label: String {
+        switch self { case .rule: "规则"; case .global: "全局"; case .direct: "直连" }
+    }
+    public var explanation: String {
+        switch self {
+        case .rule: "按订阅规则分流，不同网站可使用不同节点。"
+        case .global: "所有交由核心处理的流量使用全局所选节点。"
+        case .direct: "流量直接发出；VPN 仍保持开启。"
+        }
+    }
 }
 
 public struct ProxyNode: Codable, Identifiable, Hashable, Sendable {
@@ -36,9 +46,10 @@ public struct ProxyGroup: Codable, Identifiable, Hashable, Sendable {
     public var kind: String
     public var members: [String]
     public var selected: String?
+    public var usesProviders: Bool?
     public var isSelectable: Bool { kind.lowercased() == "select" || kind.lowercased() == "selector" }
-    public init(name: String, kind: String, members: [String], selected: String? = nil) {
-        self.name = name; self.kind = kind; self.members = members; self.selected = selected
+    public init(name: String, kind: String, members: [String], selected: String? = nil, usesProviders: Bool? = nil) {
+        self.name = name; self.kind = kind; self.members = members; self.selected = selected; self.usesProviders = usesProviders
     }
 }
 

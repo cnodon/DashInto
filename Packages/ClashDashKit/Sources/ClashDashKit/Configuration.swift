@@ -101,7 +101,8 @@ public enum ConfigurationParser {
             guard let name = group["name"] as? String, !name.isEmpty, let kind = group["type"] as? String else {
                 throw DashError.message("策略组需要有效的 name 和 type 字段。")
             }
-            return ProxyGroup(name: name, kind: kind, members: group["proxies"] as? [String] ?? [])
+            let dynamic = !(group["use"] as? [String] ?? []).isEmpty || group["include-all"] as? Bool == true || group["include-all-providers"] as? Bool == true
+            return ProxyGroup(name: name, kind: kind, members: group["proxies"] as? [String] ?? [], usesProviders: dynamic)
         }
         let names = nodes.map(\.name) + groups.map(\.name)
         guard Set(names).count == names.count else { throw DashError.message("存在重名节点或策略组，请使用唯一名称。") }

@@ -44,8 +44,11 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
                     try await store.materializeGeodata(profileID: profileID, descriptor: descriptor, directory: working)
                 }
                 TunnelStartupStatus.write(to: container, generation: generation, phase: "starting", startupID: startupID)
+                let summary = preferences?.versions.first { $0.id == generation }?.summary
+                let groups = summary.map { ProxySelection.configurationGroups(summary: $0) + [ProxySelection.globalGroup(summary: $0)] } ?? []
+                let selections = ProxySelection.defaultSelections(groups: groups, saved: preferences?.selections ?? [:])
                 runtime.start(text: envelope.runtime, container: container, profileID: profileID,
-                              selections: preferences?.selections ?? [:], mode: preferences?.preferredMode ?? .rule) { [weak self, weak runtime] error in
+                              selections: selections, mode: preferences?.preferredMode ?? .rule) { [weak self, weak runtime] error in
                     TunnelStartupStatus.write(to: container, generation: generation, phase: error == nil ? "ready" : "failed", startupID: startupID,
                                               failure: error?.localizedDescription)
                     if error != nil, self?.engine === runtime { self?.engine = nil }

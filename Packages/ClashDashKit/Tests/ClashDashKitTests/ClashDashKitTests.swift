@@ -178,6 +178,22 @@ final class ClashDashKitTests: XCTestCase {
         do { _ = try await store.envelope(profileID: profile.id, generation: profile.selectedVersion); XCTFail("Tampering must fail authentication") } catch {}
         do { _ = try await store.envelope(profileID: profile.id, generation: "../../escape"); XCTFail("Traversal must be rejected") } catch {}
     }
+    func testRenamePreservesIdentityConfigurationAndSelections() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = ProfileStore(root: root, keyProvider: TestKey())
+        let state = try await store.importConfiguration(ConfigurationParser.prepare(sample), name: "Original")
+        let profile = try XCTUnwrap(state.activeProfile)
+        _ = try await store.rememberSelection(profileID: profile.id, group: "Select", member: "Tokyo")
+        _ = try await store.rename(profileID: profile.id, name: "我的订阅")
+        let renamed = try await store.library()
+        XCTAssertEqual(renamed.activeProfile?.id, profile.id)
+        XCTAssertEqual(renamed.activeProfile?.name, "我的订阅")
+        XCTAssertEqual(renamed.activeProfile?.selectedVersion, profile.selectedVersion)
+        XCTAssertEqual(renamed.activeProfile?.selections?["Select"], "Tokyo")
+        let envelope = try await store.envelope(profileID: profile.id, generation: profile.selectedVersion)
+        XCTAssertFalse(envelope.runtime.isEmpty)
+    }
     func testSelectionsSurviveSubscriptionUpdateAndReload() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }
@@ -190,6 +206,9 @@ final class ClashDashKitTests: XCTestCase {
         let reloaded = try await ProfileStore(root: root, keyProvider: TestKey()).library()
         XCTAssertEqual(reloaded.activeProfile?.selections?["Select"], "Tokyo")
         XCTAssertEqual(reloaded.activeProfile?.preferredMode, .global)
+        _ = try await store.rememberMode(profileID: profile.id, mode: .direct)
+        let direct = try await ProfileStore(root: root, keyProvider: TestKey()).library()
+        XCTAssertEqual(direct.activeProfile?.preferredMode, .direct)
     }
     func testGeodataCopiesAndTamperDoesNotReplaceWorkingFile() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
