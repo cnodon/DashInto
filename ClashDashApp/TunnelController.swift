@@ -139,14 +139,11 @@ final class TunnelController: ConnectionDriving {
         let generation = configuredGeneration
         let requestEpoch = epoch
         let data = try JSONEncoder().encode(request)
-        // A single callback gate handles provider replies and timeouts without double-resuming.
-        return try await withCheckedThrowingContinuation { continuation in
-            let gate = ReplyGate(continuation)
-            DispatchQueue.main.asyncAfter(deadline: .now() + (["delay", "validation-udp"].contains(method) ? 20 : 8)) {
-                gate.finish(.failure(DashError.message("扩展响应超时，请重试或查看诊断。")))
-            }
-            do {
-                try session.sendProviderMessage(data) { response in
+        // Cancellation releases a pending callback immediately; late replies cannot resume it twice.
+        let timeout: TimeInterval = method == "delay" ? 12 : method == "validation-udp" ? 20 : 8
+        return try await CallbackDeadline.run(timeout: timeout) { complete in
+            try session.sendProviderMessage(data) { response in
+                Task { @MainActor in
                     do {
                         guard let response, response.count <= 512 * 1024 else { throw DashError.message("扩展响应为空或超过大小限制。") }
                         let reply = try JSONDecoder().decode(TunnelReply.self, from: response)
@@ -158,10 +155,11 @@ final class TunnelController: ConnectionDriving {
                             throw DashError.message("连接已变化，请重试。")
                         }
                         if let error = reply.error { throw DashError.message(error) }
-                        gate.finish(.success(reply.payload ?? Data("{}".utf8)))
-                    } catch { gate.finish(.failure(error)) }
+                        complete(.success(reply.payload ?? Data("{}".utf8)))
+                    } catch { complete(.failure(error)) }
                 }
-            } catch { gate.finish(.failure(error)) }
+            }
+            return nil
         }
     }
     func updateRuntime() async {
@@ -194,14 +192,4 @@ final class TunnelController: ConnectionDriving {
         }
     }
     func stopPolling() { pollingToken = UUID(); polling?.cancel(); polling = nil }
-}
-
-private final class ReplyGate: @unchecked Sendable {
-    private let lock = NSLock()
-    private var continuation: CheckedContinuation<Data, Error>?
-    init(_ continuation: CheckedContinuation<Data, Error>) { self.continuation = continuation }
-    func finish(_ result: Result<Data, Error>) {
-        lock.lock(); let pending = continuation; continuation = nil; lock.unlock()
-        pending?.resume(with: result)
-    }
 }

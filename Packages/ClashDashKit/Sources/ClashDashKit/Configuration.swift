@@ -90,7 +90,14 @@ public enum ConfigurationParser {
         guard !proxies.isEmpty || !providers.isEmpty || !rules.isEmpty else {
             throw DashError.message("没有找到节点或分流规则。请使用 Clash / mihomo 订阅地址，而不是管理面板网址或节点列表。")
         }
-        guard providers.count + ruleProviders.count <= 16 else { throw DashError.message("远程资源数量超过首版支持范围（16 项）。") }
+        let allProviders = Array(providers.values) + Array(ruleProviders.values)
+        let remoteCount = allProviders.filter { ($0 as? [String: Any])?["url"] != nil }.count
+        let inlineCount = allProviders.filter {
+            guard let provider = $0 as? [String: Any] else { return false }
+            return provider["type"] as? String == "inline" && provider["url"] == nil
+        }.count
+        guard remoteCount <= 16 else { throw DashError.message("远程资源数量超过支持范围（16 项）。内联规则不计入此限制。") }
+        guard allProviders.count <= 256 else { throw DashError.message("节点与规则资源总数超过支持范围（256 项）。") }
         let nodes = try proxies.map { node -> ProxyNode in
             guard let name = node["name"] as? String, !name.isEmpty, let kind = node["type"] as? String else {
                 throw DashError.message("节点需要有效的 name 和 type 字段。")
@@ -125,7 +132,7 @@ public enum ConfigurationParser {
         for group in groups { try visit(group.name) }
         var warnings = ["TUN、监听端口和外部控制器由 iOS 运行环境管理。"]
         if !processRules.isEmpty { warnings.append("已跳过 \(processRules.count) 条 iOS 无法执行的 PROCESS / UID 进程规则；其余规则保持原有顺序。原始配置仍完整保留。") }
-        if !providers.isEmpty || !ruleProviders.isEmpty { warnings.append("远程节点和规则资源会随订阅一起准备。任何一项读取失败都会保留旧版本。") }
+        if remoteCount > 0 { warnings.append("远程节点和规则资源会随订阅一起准备。任何一项读取失败都会保留旧版本。") }
         if rules.contains(where: { $0.contains("GEOIP,") || $0.contains("GEOSITE,") }) {
             warnings.append("配置使用地理数据库；首次连接可能需要下载对应资源。")
         }
@@ -190,6 +197,8 @@ public enum ConfigurationParser {
         var prepared = PreparedConfiguration(original: text, runtime: runtime,
             summary: .init(nodes: nodes, groups: groups, rules: rules, providerCount: providers.count + ruleProviders.count, warnings: warnings), hash: hash)
         prepared.resourceRequests = resourceRequests
+        prepared.summary.remoteResourceCount = remoteCount
+        prepared.summary.inlineResourceCount = inlineCount
         return prepared
     }
 

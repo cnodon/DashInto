@@ -42,14 +42,14 @@ final class ClashDashKitTests: XCTestCase {
         let saved = try await store.library()
         XCTAssertEqual(saved.activeProfile?.selectedVersion, second.generation)
     }
-    func testSubscriptionInstallerLinksAndHTTPSBoundary() throws {
+    func testSubscriptionInstallerLinksAndHTTPAddressParsing() throws {
         let url = "https://example.com/sub?token=example%2Btoken"
         let encoded = url.addingPercentEncoding(withAllowedCharacters: .alphanumerics)!
         XCTAssertEqual(try ImportAddress.subscriptionURL(from: "clash://install-config?url=" + encoded).absoluteString, url)
         let sub = "sub://" + Data(url.utf8).base64EncodedString()
         XCTAssertEqual(try ImportAddress.subscriptionURL(from: sub).absoluteString, url)
         XCTAssertEqual(try ImportAddress.subscriptionURL(from: "shadowrocket://add/" + sub).absoluteString, url)
-        XCTAssertThrowsError(try ImportAddress.subscriptionURL(from: "http://example.com/sub"))
+        XCTAssertEqual(try ImportAddress.subscriptionURL(from: "http://example.com/sub").scheme, "http")
         XCTAssertThrowsError(try ImportAddress.subscriptionURL(from: "file:///etc/passwd"))
         XCTAssertThrowsError(try ImportAddress.subscriptionURL(from: "https://user:secret@example.com/sub"))
         XCTAssertTrue(ImportAddress.isNodeLink("ss://example"))

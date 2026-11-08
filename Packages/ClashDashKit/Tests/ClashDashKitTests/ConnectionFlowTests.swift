@@ -9,6 +9,64 @@ import XCTest
         for _ in 0..<500 { if predicate() { return }; try await Task.sleep(for: .milliseconds(2)) }
         XCTFail("Flow did not reach its expected terminal state")
     }
+    func testHungRuntimeHasOverallDeadlineAndLateReplyCannotConnect() async throws {
+        let driver = FakeDriver(); driver.pauseRuntime = true
+        let flow = ConnectionCoordinator(driver: driver, interval: .milliseconds(1), startupTimeout: 0.03, probe: { NetworkCheck(passed: 2) })
+        flow.start(profile()) {}
+        try await settle { driver.runtimeWait != nil }
+        try await settle { flow.step == .failed }
+        XCTAssertEqual(driver.phase, .stopped)
+        XCTAssertTrue(flow.failure?.contains("超时") == true)
+        driver.runtimeWait?.resume(); driver.runtimeWait = nil
+        try await Task.sleep(for: .milliseconds(15))
+        XCTAssertEqual(flow.step, .failed)
+        flow.reconcile()
+        XCTAssertEqual(flow.step, .failed, "Polling must preserve actionable startup failures")
+        XCTAssertNil(flow.checkedSession)
+    }
+    func testHungHealthCheckKeepsTunnelAndAllowsRetry() async throws {
+        let driver = FakeDriver(); let probe = SuspendedProbe()
+        let flow = ConnectionCoordinator(driver: driver, interval: .milliseconds(1), checkTimeout: 0.03, probe: { await probe.run() })
+        flow.start(profile()) {}
+        try await settle { flow.step == .limited }
+        XCTAssertEqual(driver.phase, .running)
+        XCTAssertNil(flow.check)
+        await probe.finish()
+        try await Task.sleep(for: .milliseconds(10))
+        XCTAssertEqual(flow.step, .limited, "Late success must not overwrite a timeout")
+        flow.cancel()
+        try await settle { flow.step == .idle }
+    }
+    func testRecoveryWithSameSessionInvalidatesAndRechecksHealth() async throws {
+        let driver = FakeDriver()
+        let flow = ConnectionCoordinator(driver: driver, interval: .milliseconds(1), probe: { NetworkCheck(passed: 2) })
+        flow.start(profile()) {}
+        try await settle { flow.step == .ready }
+        let session = driver.runtime?.sessionID
+        driver.phase = .starting
+        flow.reconcile()
+        XCTAssertNil(flow.check)
+        XCTAssertNil(flow.checkedSession)
+        XCTAssertEqual(driver.runtime?.sessionID, session)
+        driver.phase = .running
+        flow.reconcile()
+        XCTAssertEqual(flow.step, .checking)
+        try await settle { flow.step == .ready }
+        XCTAssertEqual(flow.checkedSession, session)
+        XCTAssertEqual(driver.events.filter { $0 == "start" }.count, 1)
+    }
+    func testNetworkChangeDoesNotRestartOrDisconnectUserTunnel() async throws {
+        let driver = FakeDriver()
+        let flow = ConnectionCoordinator(driver: driver, interval: .milliseconds(1), probe: { NetworkCheck(passed: 2) })
+        flow.start(profile()) {}
+        try await settle { flow.step == .ready }
+        flow.networkChanged()
+        XCTAssertEqual(driver.phase, .running)
+        XCTAssertNil(flow.check)
+        flow.reconcile()
+        try await settle { flow.step == .ready }
+        XCTAssertEqual(driver.events, ["stop", "start"])
+    }
     func testSwitchWaitsForStopAndUsesExactImportedGeneration() async throws {
         let driver = FakeDriver(); driver.phase = .running
         let flow = ConnectionCoordinator(driver: driver, interval: .milliseconds(1), probe: { NetworkCheck(passed: 2) })
@@ -85,6 +143,8 @@ import XCTest
     var pauseAuthorization = false
     var wrongGeneration = false
     var denied = false
+    var pauseRuntime = false
+    var runtimeWait: CheckedContinuation<Void, Never>?
     var authorization: CheckedContinuation<Void, Never>?
     func connect(profile: Profile) async throws {
         if pauseAuthorization { await withCheckedContinuation { authorization = $0 } }
@@ -96,10 +156,11 @@ import XCTest
     func disconnect() { phase = .stopped; runtime = nil }
     func waitUntilDisconnected() async throws { events.append("stop"); disconnect() }
     func refreshState() {}
-    func updateRuntime() async {}
+    func updateRuntime() async { if pauseRuntime { await withCheckedContinuation { runtimeWait = $0 } } }
 }
 private actor SuspendedProbe {
     var continuation: CheckedContinuation<NetworkCheck, Never>?
-    func run() async -> NetworkCheck { await withCheckedContinuation { continuation = $0 } }
-    func finish() { continuation?.resume(returning: NetworkCheck(passed: 2)); continuation = nil }
+    private var earlyResult: NetworkCheck?
+    func run() async -> NetworkCheck { if let earlyResult { return earlyResult }; return await withCheckedContinuation { continuation = $0 } }
+    func finish() { earlyResult = NetworkCheck(passed: 2); continuation?.resume(returning: NetworkCheck(passed: 2)); continuation = nil }
 }

@@ -113,15 +113,16 @@ struct AppUpdateView: View {
                 Toggle("自动检查新版本", isOn: $updates.automatic)
                 Toggle("包含开发版本", isOn: $updates.development)
                 Toggle("发现更新时通知", isOn: Binding(get: { updates.notifications }, set: { value in Task { await updates.setNotifications(value) } }))
-            } footer: { Text("打开 App 时检查；后台检查时间由 iOS 安排，不能保证每次推送代码后立即收到通知。只读取所选公共仓库的发布版本。") }
+            } footer: { Text("GitHub 检查已发布的 Release，提交代码不会触发版本更新。后台检查时间由 iOS 安排。") }
             if let release = updates.latest {
                 Section("更新说明") { Text(release.body ?? "此版本未提供说明。").font(.subheadline).textSelection(.enabled) }
                 if let url = updates.releaseURL { Section { Link("查看 GitHub 版本", destination: url) } }
             }
             Section {
+                LabeledContent("版本来源", value: "GitHub Releases")
+                LabeledContent("安装方式", value: updates.testFlightURL == nil ? "Mac / Xcode" : "TestFlight")
                 if let url = updates.testFlightURL { Link("在 TestFlight 中打开", destination: url) }
-                else { Text("等待首次 TestFlight 发布").foregroundStyle(.secondary) }
-            } header: { Text("TestFlight") } footer: { Text(updates.testFlightURL == nil ? "TestFlight 安装入口尚未配置；当前真机版可用 Mac / Xcode 更新。" : "自动安装由 TestFlight 管理，可在 TestFlight 中开启自动更新。") }
+            } header: { Text("更新安装") } footer: { Text(updates.testFlightURL == nil ? "GitHub 用于发现新版本和查看说明，不能直接覆盖安装。当前本地版通过 Mac / Xcode 更新；TestFlight 尚未接入。" : "GitHub 用于发现新版本和查看说明。安装由 TestFlight 管理，可在 TestFlight 中开启自动更新。") }
         }.navigationTitle("软件更新").navigationBarTitleDisplayMode(.inline).toolbar(.visible, for: .navigationBar)
             .onAppear { repositoryInput = updates.repository }
     }

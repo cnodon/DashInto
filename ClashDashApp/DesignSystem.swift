@@ -49,7 +49,7 @@ enum DashMotion {
     static let state = Animation.easeOut(duration: 0.2)
 }
 
-private struct DashPressStyle: ButtonStyle {
+struct DashPressStyle: ButtonStyle {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.isEnabled) private var enabled
     func makeBody(configuration: Configuration) -> some View {

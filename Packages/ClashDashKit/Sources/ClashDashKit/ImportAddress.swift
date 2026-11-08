@@ -11,9 +11,9 @@ public enum ImportAddress {
         guard depth < 4, input.utf8.count <= 16_384 else { throw DashError.message("订阅地址过长或嵌套层数过多。") }
         let text = input.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let components = URLComponents(string: text), let scheme = components.scheme?.lowercased() else {
-            throw DashError.message("请输入 HTTPS 订阅地址，或粘贴客户端的订阅安装链接。")
+            throw DashError.message("请输入 HTTP / HTTPS 订阅地址，或粘贴客户端的订阅安装链接。")
         }
-        if scheme == "https", let url = components.url, let host = url.host, !host.isEmpty, url.user == nil, url.password == nil {
+        if ["https", "http"].contains(scheme), let url = components.url, let host = url.host, !host.isEmpty, url.user == nil, url.password == nil {
             return url
         }
         let wrappers: Set<String> = ["clash", "clashmeta", "clash-verge", "clashdash", "shadowrocket", "surge", "sing-box", "sub"]
@@ -32,6 +32,6 @@ public enum ImportAddress {
                 return try unwrap(value.removingPercentEncoding ?? value, depth: depth + 1)
             }
         }
-        throw DashError.message("订阅下载需要 HTTPS 地址。节点链接请使用“粘贴节点或配置”。")
+        throw DashError.message("订阅下载需要 HTTP / HTTPS 地址。节点链接请使用“粘贴节点或配置”。")
     }
 }

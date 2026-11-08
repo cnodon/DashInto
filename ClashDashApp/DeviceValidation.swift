@@ -28,6 +28,7 @@ import ClashDashKit
             runID = request["runID"] as? String ?? ""
             guard UUID(uuidString: runID) != nil else { throw DashError.message("Invalid validation run") }
             mode = request["mode"] as? String ?? "direct"
+            let workflow = request["subscriptionWorkflow"] as? Bool == true
             guard ["direct", "subscription"].contains(mode), !TunnelController.isSimulator else { throw DashError.message("Physical device required") }
             progress("prepare-import", model)
             stage = "prepare-import"
@@ -38,7 +39,7 @@ import ClashDashKit
                 guard let address = request["subscriptionURL"] as? String else { throw DashError.message("Missing subscription") }
                 let url = try ImportAddress.subscriptionURL(from: address)
                 stage = "download-subscription"; progress(stage, model)
-                let downloaded = try await SubscriptionClient().download(url)
+                let downloaded = try await SubscriptionClient().download(url, allowInsecureHTTP: request["allowInsecureHTTP"] as? Bool == true)
                 text = downloaded.text; source = url; usage = downloaded.usage
             } else {
                 guard let fixture = Bundle.main.url(forResource: "direct-diagnostic", withExtension: "yaml") else { throw DashError.message("Missing fixture") }
@@ -50,17 +51,28 @@ import ClashDashKit
             let prepared = try await NativeResourcePreparer.shared.prepare(parsed)
             stage = "save-import"; progress(stage, model)
             let priorID = model.library.selectedProfileID
-            let profile: Profile
+            var profile: Profile
             if request["reuseSelected"] as? Bool == true, let selected = model.activeProfile {
                 profile = selected
             } else {
-                let commit = try await model.save(prepared, name: mode == "subscription" ? "已验证订阅" : "iPhone 直连验证", url: source, usage: usage)
+                let commit = try await model.save(prepared, name: request["profileName"] as? String ?? (mode == "subscription" ? "已验证订阅" : "iPhone 直连验证"), url: source, usage: usage)
                 guard let saved = commit.library.profiles.first(where: { $0.id == commit.profileID }) else { throw DashError.message("Save failed") }
                 profile = saved
                 checks.append(["check": "save-only-preserves-selection", "passed": model.library.selectedProfileID == priorID])
             }
             checks.append(["check": "import", "passed": true, "nodes": prepared.summary.nodes.count, "groups": prepared.summary.groups.count,
-                           "rules": prepared.summary.rules.count, "geodataCount": prepared.geodata.count])
+                           "rules": prepared.summary.rules.count, "geodataCount": prepared.geodata.count, "protocols": Array(Set(prepared.summary.nodes.map(\.kind))).sorted()])
+            if workflow {
+                stage = "refresh-saved-subscription"; progress(stage, model)
+                await model.refresh(profile)
+                guard model.errorMessage == nil, let refreshed = model.library.profiles.first(where: { $0.id == profile.id }) else {
+                    throw DashError.message("Saved subscription refresh failed")
+                }
+                profile = refreshed
+                let envelope = try await model.store.envelope(profileID: profile.id, generation: profile.selectedVersion)
+                checks.append(["check": "approved-source-preserved-for-refresh", "passed": envelope.sourceURL == source?.absoluteString])
+                guard envelope.sourceURL == source?.absoluteString else { throw DashError.message("Subscription source changed") }
+            }
             stage = "connect"
             progress(stage, model)
             model.useAndConnect(profile)
@@ -69,7 +81,7 @@ import ClashDashKit
             if let check = model.connection.check { checks.append(["check": "default-routing-https", "passed": check.successful, "targetsPassed": check.passed]) }
             checks.append(["check": "packet-tunnel-and-ipc", "passed": true, "coreVersion": model.tunnel.runtime?.coreVersion ?? ""])
             var selectedNode: ProxyNode?
-            if mode == "subscription" {
+            if mode == "subscription" && !workflow {
                 stage = "select-global-node"; progress(stage, model)
                 guard let node = prepared.summary.nodes.first(where: { $0.kind == "anytls" }) ?? prepared.summary.nodes.first else { throw DashError.message("No nodes") }
                 selectedNode = node
@@ -90,10 +102,30 @@ import ClashDashKit
             let delta = max(after - before, 0)
             checks.append(["check": "observed-tunnel-bytes", "passed": delta > 0, "bytes": delta])
             guard delta > 0 else { throw DashError.message("No packet-flow traffic observed") }
-            stage = "system-udp-dns"; progress(stage, model)
-            let dns = try await DeviceDNSProbe.query()
-            checks.append(["check": "system-udp-dns", "passed": dns])
-            guard dns else { throw DashError.message("System UDP DNS failed") }
+            if workflow {
+                stage = "batch-node-delay"; progress(stage, model)
+                await model.refreshGroups(force: true)
+                let names = model.proxyTestNames
+                guard !names.isEmpty else { throw DashError.message("No testable nodes") }
+                model.startDelayTests(names)
+                let deadline = ContinuousClock.now.advanced(by: .seconds(max(30, names.count * 6)))
+                while model.delayTestBusy && ContinuousClock.now < deadline { try await Task.sleep(for: .milliseconds(100)) }
+                let finished = !model.delayTests.isRunning && model.delayTests.finishedAt != nil && model.delayTests.completed == names.count
+                checks.append(["check": "batch-node-delay", "passed": finished, "completed": model.delayTests.completed,
+                               "total": model.delayTests.total, "reachable": model.delayTests.succeeded, "failed": model.delayTests.failed])
+                guard finished else { throw DashError.message("Node test queue did not finish") }
+                stage = "homepage-checks"; progress(stage, model)
+                model.dashboard.refreshNetwork(model.tunnel)
+                for _ in 0..<200 where model.dashboard.checking { try await Task.sleep(for: .milliseconds(100)) }
+                checks.append(["check": "homepage-websites", "passed": !model.dashboard.checking && model.dashboard.sites.count == 4,
+                               "results": model.dashboard.sites.map { ["site": $0.id, "state": $0.state.rawValue] }])
+                checks.append(["check": "egress-available", "passed": model.dashboard.egress?.address != nil])
+            } else {
+                stage = "system-udp-dns"; progress(stage, model)
+                let dns = try await DeviceDNSProbe.query()
+                checks.append(["check": "system-udp-dns", "passed": dns])
+                guard dns else { throw DashError.message("System UDP DNS failed") }
+            }
             if let node = selectedNode {
                 stage = "proxy-udp-dns"; progress(stage, model)
                 let data = try await model.tunnel.request("validation-udp", parameters: ["name": node.name])

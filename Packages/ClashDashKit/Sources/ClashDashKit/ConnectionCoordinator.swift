@@ -103,12 +103,15 @@ public enum ConnectionStep: String, Sendable {
     @ObservationIgnored private let probe: @Sendable () async -> NetworkCheck
     @ObservationIgnored private let interval: Duration
     @ObservationIgnored private let attempts: Int
+    @ObservationIgnored private let startupTimeout: TimeInterval
+    @ObservationIgnored private let checkTimeout: TimeInterval
     @ObservationIgnored private var task: Task<Void, Never>?
     @ObservationIgnored private var attempt = UUID()
 
-    public init(driver: any ConnectionDriving, interval: Duration = .milliseconds(500), attempts: Int = 90,
+    public init(driver: any ConnectionDriving, interval: Duration = .milliseconds(500), attempts: Int = 90, startupTimeout: TimeInterval = 60, checkTimeout: TimeInterval = 15,
                 probe: @escaping @Sendable () async -> NetworkCheck = { await NetworkCheck.run() }) {
         self.driver = driver; self.interval = interval; self.attempts = attempts; self.probe = probe
+        self.startupTimeout = startupTimeout; self.checkTimeout = checkTimeout
     }
 
     public func start(_ profile: Profile, activate: @escaping @MainActor () async throws -> Void) {
@@ -129,25 +132,25 @@ public enum ConnectionStep: String, Sendable {
                 try await driver.connect(profile: profile)
                 try valid(token)
                 step = .starting
-                for index in 0..<attempts {
-                    try valid(token); driver.refreshState()
-                    if driver.phase == .running {
-                        await driver.updateRuntime()
-                        try valid(token)
-                        if let runtime = driver.runtime, runtime.generation == profile.selectedVersion {
-                            await checkNetwork(token: token, session: runtime.sessionID)
-                            return
+                let session = try await bounded(timeout: startupTimeout) { [self] in
+                    for index in 0..<self.attempts {
+                        try self.valid(token); self.driver.refreshState()
+                        if self.driver.phase == .running {
+                            await self.driver.updateRuntime()
+                            try self.valid(token)
+                            if let runtime = self.driver.runtime, runtime.generation == profile.selectedVersion { return runtime.sessionID }
                         }
+                        if index > 3, self.driver.phase == .stopped { throw DashError.message(self.driver.lastError ?? "VPN 未能启动。请检查系统授权与网络后重试。") }
+                        try await Task.sleep(for: self.interval)
                     }
-                    if index > 3, driver.phase == .stopped { throw DashError.message(driver.lastError ?? "VPN 未能启动。请确认系统 VPN 授权，并检查订阅后重试。") }
-                    try await Task.sleep(for: interval)
+                    throw DashError.message("网络核心未在限定时间内就绪，请重试。")
                 }
-                throw DashError.message("网络核心未在限定时间内就绪。请重试或查看运行诊断。")
+                await checkNetwork(token: token, session: session)
             } catch {
                 guard token == attempt else { return }
                 driver.disconnect()
                 if error is CancellationError { step = .idle }
-                else { failure = error.localizedDescription; step = .failed }
+                else { failure = (error as? URLError)?.code == .timedOut ? "网络核心启动超时，请重试或查看运行诊断。" : error.localizedDescription; step = .failed }
             }
         }
     }
@@ -164,9 +167,22 @@ public enum ConnectionStep: String, Sendable {
     public func retryCheck() {
         guard !step.inProgress, driver.phase == .running, let runtime = driver.runtime else { return }
         task?.cancel(); attempt = UUID(); let token = attempt
+        step = .checking
         task = Task { [weak self] in await self?.checkNetwork(token: token, session: runtime.sessionID) }
     }
+    /// Invalidates health evidence without tearing down a tunnel that is recovering.
+    public func networkChanged() {
+        check = nil; checkedSession = nil
+        if step == .checking || !step.inProgress {
+            task?.cancel(); attempt = UUID(); step = .idle; failure = nil
+        }
+    }
     public func reconcile() {
+        if driver.phase != .running && (step == .checking || checkedSession != nil) {
+            networkChanged()
+            if driver.phase == .stopped, let error = driver.lastError { failure = error; step = .failed }
+            return
+        }
         guard !step.inProgress else { return }
         if driver.phase == .stopped {
             if checkedSession != nil {
@@ -184,12 +200,30 @@ public enum ConnectionStep: String, Sendable {
     private func checkNetwork(token: UUID, session: String) async {
         guard token == attempt, !Task.isCancelled else { return }
         step = .checking; check = nil
-        let result = await probe()
+        let result: NetworkCheck
+        do { result = try await bounded(timeout: checkTimeout) { [probe] in await probe() } }
+        catch {
+            guard token == attempt, !Task.isCancelled else { return }
+            guard driver.phase == .running, driver.runtime?.sessionID == session else { networkChanged(); return }
+            check = nil; checkedSession = session; step = .limited
+            failure = "网络检查未完成，可重试检查；VPN 仍保持连接。"
+            return
+        }
         guard token == attempt, !Task.isCancelled else { return }
         guard driver.phase == .running, driver.runtime?.sessionID == session else {
-            step = .failed; failure = "检查期间连接已变化，请重新连接。"; return
+            networkChanged(); return
         }
         check = result; checkedSession = session; failure = nil
         step = result.successful ? .ready : .limited
     }
+    private func bounded<T: Sendable>(timeout: TimeInterval, operation: @escaping @MainActor () async throws -> T) async throws -> T {
+        try await CallbackDeadline.run(timeout: timeout) { complete in
+            let child = Task { @MainActor in
+                do { complete(.success(try await operation())) }
+                catch { complete(.failure(error)) }
+            }
+            return { child.cancel() }
+        }
+    }
+
 }

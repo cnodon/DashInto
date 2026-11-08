@@ -1,6 +1,65 @@
 import XCTest
 
 final class PhysicalReleaseTests: XCTestCase {
+    func testApprovedSubscriptionImportRefreshConnectAndDelay() throws {
+        guard ProcessInfo.processInfo.environment["CLASHDASH_PHYSICAL_RELEASE"] == "1",
+              let address = ProcessInfo.processInfo.environment["CLASHDASH_TEST_SUBSCRIPTION_URL"] else {
+            throw XCTSkip("Explicit user-authorized private subscription run only")
+        }
+        let name = ProcessInfo.processInfo.environment["CLASHDASH_TEST_SUBSCRIPTION_NAME"] ?? "测试订阅"
+        let app = XCUIApplication(bundleIdentifier: "app.clashdash.ios"); app.activate()
+        app.tabBars.buttons["订阅"].tap()
+        if !app.buttons["profileDetail-" + name].exists {
+            app.buttons["添加订阅"].tap()
+            let field = app.textFields["profileName"]
+            field.tap(); field.typeText(name + "\n")
+            let source = app.textFields["subscriptionURL"]
+            source.tap(); source.typeText(address + "\n")
+            app.buttons["readSubscription"].tap()
+            if address.hasPrefix("http://") {
+                let alert = app.alerts["使用未加密的订阅？"]
+                XCTAssertTrue(alert.waitForExistence(timeout: 5))
+                alert.buttons["继续导入"].tap()
+            }
+            let save = app.buttons["saveProfile"]
+            XCTAssertTrue(save.waitForExistence(timeout: 150), "Download, resource preparation and core validation must reach preview")
+            XCTAssertEqual(app.textFields["profileName"].value as? String, name)
+            save.tap()
+        }
+        let detail = app.buttons["profileDetail-" + name]
+        XCTAssertTrue(detail.waitForExistence(timeout: 15))
+        detail.tap()
+        let refresh = app.buttons["更新订阅"]
+        XCTAssertTrue(refresh.waitForExistence(timeout: 5)); refresh.tap()
+        XCTAssertTrue(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true"), object: refresh)], timeout: 90) == .completed)
+        XCTAssertFalse(app.alerts["操作未完成"].exists, "Refreshing an approved HTTP subscription must also work")
+        let use = app.buttons.matching(NSPredicate(format: "label == '使用并连接' OR label == '切换并重连'")).firstMatch
+        XCTAssertTrue(use.exists); use.tap()
+        let status = app.staticTexts["connectionStatus"]
+        XCTAssertTrue(waitLabel(status, "已连接", timeout: 100), "VPN plus real network checks must complete")
+        defer {
+            if app.state == .runningForeground {
+                app.tabBars.buttons["首页"].tap()
+                let disconnect = app.buttons["connectionButton"]
+                for _ in 0..<4 where !disconnect.isHittable { app.swipeDown() }
+                if disconnect.label == "断开连接" { disconnect.tap() }
+            }
+        }
+        XCTAssertTrue(app.buttons["homeSubscription"].label.contains(name))
+        app.tabBars.buttons["代理"].tap()
+        let all = app.buttons["testAllProxies"]
+        XCTAssertTrue(all.waitForExistence(timeout: 15)); XCTAssertTrue(all.isEnabled); all.tap()
+        let summary = app.staticTexts["delayTestSummary"]
+        XCTAssertTrue(summary.waitForExistence(timeout: 120), "Real batch must finish")
+        XCTAssertFalse(summary.label.contains("0 / 0"))
+        XCTAssertEqual(app.state, .runningForeground)
+        app.tabBars.buttons["首页"].tap()
+        let sites = app.buttons["refreshWebsites"]
+        for _ in 0..<4 where !sites.isHittable { app.swipeUp() }
+        XCTAssertTrue(sites.waitForExistence(timeout: 5))
+        XCTAssertTrue(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true"), object: sites)], timeout: 30) == .completed)
+        for site in ["Google", "YouTube", "OpenAI", "Claude"] { XCTAssertTrue(app.buttons["website-" + site].isEnabled) }
+    }
     func testExistingSubscriptionConnectsAndDisconnects() throws {
         guard ProcessInfo.processInfo.environment["CLASHDASH_PHYSICAL_RELEASE"] == "1" else {
             throw XCTSkip("Explicit physical Release run only; preserves the existing user library")

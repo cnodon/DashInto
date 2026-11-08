@@ -45,7 +45,7 @@ final class DashboardMonitor {
     func refreshNetwork(_ tunnel: TunnelController) {
         guard tunnel.state == .connected, let session = tunnel.runtime?.sessionID, !checking else { return }
         probeToken = UUID(); let token = probeToken
-        checking = true; sites = []; egress = nil
+        checking = true
         probeTask = Task { [weak self] in
             guard let self else { return }
             enum Result: Sendable { case site(WebsiteProbeResult), ip(EgressResult) }
@@ -57,7 +57,7 @@ final class DashboardMonitor {
                 for await result in tasks {
                     guard !Task.isCancelled, self.probeToken == token, tunnel.runtime?.sessionID == session else { tasks.cancelAll(); return }
                     switch result {
-                    case .site(let value): self.sites.append(value)
+                    case .site(let value): self.sites.removeAll { $0.id == value.id }; self.sites.append(value)
                     case .ip(let value): self.egress = value
                     }
                 }

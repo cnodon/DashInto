@@ -23,9 +23,9 @@ struct OverviewView: View {
                 }
                 if let profile = model.displayProfile {
                     if connected {
-                        trafficCard
+                        trafficCard.transition(.opacity)
                         subscriptionCard(profile)
-                        websitesCard
+                        websitesCard.transition(.opacity)
                         if model.connection.step == .limited {
                             Button { model.connection.retryCheck() } label: {
                                 Label("部分网络检查未通过 · 重试", systemImage: "arrow.clockwise")
@@ -37,70 +37,98 @@ struct OverviewView: View {
                     }
                     if model.hasPendingUpdate { Button("应用更新并重连") { model.useAndConnect(profile) }.font(.subheadline).disabled(model.connection.step.inProgress || model.busy) }
                 }
-            }.padding(.horizontal, 16).padding(.vertical, 8).frame(maxWidth: 680).frame(maxWidth: .infinity)
+            }.animation(reduceMotion ? nil : .smooth(duration: 0.3), value: connected)
+                .padding(.horizontal, 16).padding(.vertical, 8).frame(maxWidth: 680).frame(maxWidth: .infinity)
         }.background(Color.dashBackground).toolbar(.hidden, for: .navigationBar).accessibilityIdentifier("homePage")
             .sheet(isPresented: $showingSources) { SubscriptionPicker() }
             .sheet(item: $sheet) { HomeDetailSheet(detail: $0).presentationDetents([.medium, .large]).presentationDragIndicator(.visible) }
             .sensoryFeedback(.success, trigger: passed) { _, value in value }
             .sensoryFeedback(.impact(flexibility: .solid, intensity: 0.5), trigger: disconnectTaps)
             .refreshable {
-                await model.refreshGroups()
-                if let profile = model.displayProfile, profile.isSubscription, !model.busy, !model.connection.step.inProgress { await model.refresh(profile) }
+                await model.tunnel.updateRuntime()
+                model.consumeSample()
+                await model.refreshGroups(force: true)
+                model.dashboard.refreshNetwork(model.tunnel)
+                model.connection.retryCheck()
             }
     }
     private var proxyCard: some View {
-        DashCard {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack(alignment: .center, spacing: 12) {
-                    DashGlyph(symbol: model.displayProfile == nil ? "link" : model.mode == .direct ? "network" : "paperplane.fill", animated: model.connection.step.inProgress)
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack(spacing: 5) {
-                            Circle().fill(connected ? Color.green : Color.secondary.opacity(0.4)).frame(width: 5, height: 5)
-                            Text(statusTitle).accessibilityIdentifier("connectionStatus")
-                            if model.connection.step.inProgress { ProgressView().controlSize(.mini) }
-                            if connected, let runtime = model.tunnel.runtime { Text(runtime.startedAt, style: .timer).monospacedDigit() }
-                        }.font(.caption2).foregroundStyle(.secondary)
-                        if model.displayProfile != nil {
-                            Button { sheet = .node } label: {
-                                VStack(alignment: .leading, spacing: 3) {
-                                    Text(model.homeProxyTitle).font(.title3.weight(.semibold)).foregroundStyle(.primary).lineLimit(2)
-                                        .accessibilityIdentifier("homeProxyName")
-                                    HStack(spacing: 4) {
-                                        Text(model.homeGroup?.name ?? (model.mode == .direct ? "不经过代理节点" : "订阅默认策略")).lineLimit(1)
-                                        Image(systemName: "chevron.right").font(.system(size: 8, weight: .semibold))
-                                    }.font(.caption2).foregroundStyle(.secondary)
-                                }.frame(maxWidth: .infinity, minHeight: 44, alignment: .leading).contentShape(Rectangle())
-                            }.buttonStyle(.plain).disabled(!connected && !model.canEditRoutes)
-                                .accessibilityIdentifier(connected ? "homeNode" : "plannedRoute")
-                        } else { Text("DashInto").font(.title2.weight(.semibold)) }
-                    }.frame(maxWidth: .infinity, alignment: .leading)
-                    if model.displayProfile != nil {
-                        VStack(alignment: .trailing, spacing: 4) {
-                            Menu {
-                                Picker("运行模式", selection: Binding(get: { model.mode }, set: { mode in Task { await model.setMode(mode) } })) {
-                                    ForEach(RoutingMode.allCases, id: \.self) { Text($0.title).tag($0) }
-                                }
-                            } label: { Text(model.mode.label).font(.caption.weight(.medium)).frame(minWidth: 44, minHeight: 44) }
-                                .disabled(!model.canEditRoutes).accessibilityIdentifier("homeMode")
-                            if connected, let name = model.homeNode, let delay = model.delays[name] { DelayIndicator(milliseconds: delay) }
-                        }
+        VStack(spacing: 18) {
+            HStack(spacing: 6) {
+                Circle().fill(connected ? Color.green : Color.secondary.opacity(0.45)).frame(width: 6, height: 6)
+                Text(statusTitle).accessibilityIdentifier("connectionStatus")
+                if model.connection.step.inProgress { ProgressView().controlSize(.mini) }
+                if connected, let runtime = model.tunnel.runtime { Text(runtime.startedAt, style: .timer).monospacedDigit() }
+            }.font(.caption).foregroundStyle(.secondary)
+
+            if let profile = model.displayProfile {
+                VStack(spacing: 4) {
+                    Text("订阅 · " + profile.name)
+                        .font(.subheadline).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                        .accessibilityIdentifier("homeSubscriptionName")
+                    Button { sheet = .node } label: {
+                        HomeRouteTitle(title: model.homeProxyTitle)
+                            .contentShape(Rectangle())
+                    }.buttonStyle(DashPressStyle()).disabled(!connected && !model.canEditRoutes)
+                        .accessibilityHint("查看或更换节点")
+                        .accessibilityIdentifier(connected ? "homeNode" : "plannedRoute")
+                    HStack(spacing: 14) {
+                        Menu {
+                            Picker("运行模式", selection: Binding(get: { model.mode }, set: { mode in Task { await model.setMode(mode) } })) {
+                                ForEach(RoutingMode.allCases, id: \.self) { Text($0.title).tag($0) }
+                            }
+                        } label: {
+                            HStack(spacing: 5) {
+                                Text(model.mode.label)
+                                Image(systemName: "chevron.down").font(.system(size: 9, weight: .semibold))
+                            }.font(.caption.weight(.medium)).foregroundStyle(.secondary)
+                                .padding(.horizontal, 12).frame(minHeight: 44).contentShape(Capsule())
+                        }.disabled(!model.canEditRoutes).accessibilityIdentifier("homeMode")
+                        if connected, let name = model.homeNode, let delay = model.delays[name] { DelayIndicator(milliseconds: delay) }
                     }
                 }
-                if model.displayProfile == nil || model.connection.step.inProgress && !connected {
-                    Text(preparationHint).font(.caption).foregroundStyle(.secondary)
-                }
-                DashPrimaryButton(title: buttonTitle, symbol: model.displayProfile == nil ? "plus" : connected || model.connection.step.inProgress || model.tunnel.phase == .starting ? "power" : "paperplane.fill", tint: connected || model.connection.step == .stopping ? .red : .dashBlue) {
-                    if connected { disconnectTaps += 1 }
-                    connectionAction()
-                }.disabled((!connected && model.busy) || model.connection.step == .stopping).accessibilityIdentifier("connectionButton")
+            } else {
+                VStack(spacing: 8) {
+                    Image(systemName: "paperplane").font(.system(size: 30, weight: .light)).padding(.bottom, 4)
+                    Text("DashInto").font(.largeTitle.weight(.semibold)).tracking(-1)
+                    Text(preparationHint).font(.subheadline).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                }.padding(.vertical, 12)
             }
-        }.animation(reduceMotion ? nil : DashMotion.state, value: connected)
+            if model.displayProfile != nil && model.connection.step.inProgress && !connected {
+                Text(preparationHint).font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                    .transition(.opacity)
+            }
+            Button {
+                if connected { disconnectTaps += 1 }
+                connectionAction()
+            } label: {
+                HStack(spacing: 9) {
+                    Image(systemName: model.displayProfile == nil ? "plus" : connected || model.connection.step.inProgress || model.tunnel.phase == .starting ? "power" : "paperplane.fill")
+                        .contentTransition(reduceMotion ? .identity : .symbolEffect(.replace))
+                    Text(buttonTitle).font(.headline)
+                }.frame(maxWidth: .infinity).frame(minHeight: 54)
+                    .foregroundStyle(connected || model.connection.step == .stopping ? Color.white : Color(uiColor: .systemBackground))
+                    .background(connected || model.connection.step == .stopping ? Color.red : Color.primary, in: Capsule())
+                    .contentShape(Capsule())
+            }.buttonStyle(DashPressStyle())
+                .disabled((!connected && model.busy) || model.connection.step == .stopping)
+                .accessibilityIdentifier("connectionButton")
+        }.padding(.horizontal, 14).padding(.top, 24).padding(.bottom, 16)
+            .frame(maxWidth: .infinity)
+            .animation(reduceMotion ? nil : .smooth(duration: 0.3), value: connected)
+            .animation(reduceMotion ? nil : .smooth(duration: 0.25), value: model.connection.step.inProgress)
     }
     private func subscriptionCard(_ profile: Profile) -> some View {
         DashCard {
             HStack(spacing: 8) {
                 NavigationLink { ProfileDetailView(profileID: profile.id).toolbar(.visible, for: .navigationBar) } label: {
-                    SubscriptionBalanceView(profile: profile)
+                    VStack(alignment: .leading, spacing: 5) {
+                        SubscriptionBalanceView(profile: profile)
+                        if model.refreshingProfileID == profile.id {
+                            Label("正在更新订阅", systemImage: "arrow.clockwise").font(.caption2).foregroundStyle(.secondary)
+                                .accessibilityIdentifier("homeSubscriptionRefreshing")
+                        }
+                    }
                 }.buttonStyle(.plain).accessibilityIdentifier("homeSubscription")
                 Button { showingSources = true } label: {
                     Image(systemName: "arrow.left.arrow.right").font(.subheadline)
@@ -186,5 +214,20 @@ struct SubscriptionBalanceView: View {
             }.frame(maxWidth: .infinity, alignment: .leading)
             if let balance = SubscriptionBalance(usage: profile.usage) { DashQuotaRing(fraction: balance.fraction) }
         }.frame(minHeight: 64)
+    }
+}
+
+/// Shared by production home and the explicitly labelled, read-only design preview.
+struct HomeRouteTitle: View {
+    var title: String
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    var body: some View {
+        Text(title).font(.system(.title, design: .default, weight: .semibold)).tracking(-0.7)
+            .foregroundStyle(.primary).multilineTextAlignment(.center)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, minHeight: 44).padding(.vertical, 2)
+            .contentTransition(.opacity)
+            .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: title)
+            .accessibilityIdentifier("homeProxyName")
     }
 }

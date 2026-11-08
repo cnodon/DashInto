@@ -4,27 +4,40 @@ import ClashDashKit
 struct SettingsView: View {
     @Environment(AppModel.self) private var model
     @AppStorage("appearance") private var appearance = "system"
+    @AppStorage("latencyTestEndpoint") private var latencyEndpoint = LatencyTestEndpoint.cloudflare.rawValue
     var body: some View {
+        @Bindable var subscriptions = model.subscriptionUpdates
         List {
+            Section("软件设置") {
+                Picker(selection: $appearance) {
+                    Text("跟随系统").tag("system"); Text("浅色").tag("light"); Text("深色").tag("dark")
+                } label: { Label("外观", systemImage: "circle.lefthalf.filled") }
+            }
+            Section {
+                Picker("测速目标", selection: $latencyEndpoint) {
+                    ForEach(LatencyTestEndpoint.allCases, id: \.rawValue) { Text($0.title).tag($0.rawValue) }
+                }.accessibilityIdentifier("latencyTestEndpoint")
+            } footer: { Text("测量节点访问该目标的 HTTPS 响应延迟，单位 ms。更换目标后需要重新测速。") }
+            Section {
+                Picker("订阅自动更新", selection: $subscriptions.intervalRaw) {
+                    ForEach(SubscriptionRefreshInterval.allCases, id: \.rawValue) { Text($0.title).tag($0.rawValue) }
+                }.accessibilityIdentifier("subscriptionRefreshInterval")
+            } footer: { Text("到期后自动更新，后台时间由 iOS 安排。失败保留原配置；当前连接在重连后应用新版本。") }
+            Section("关于 DashInto") {
+                LabeledContent("App 版本", value: DashConstants.appVersion)
+                NavigationLink { PrivacyView().toolbar(.visible, for: .navigationBar) } label: { Label("数据与隐私", systemImage: "hand.raised") }
+                NavigationLink { LicenseView().toolbar(.visible, for: .navigationBar) } label: { Label("法律与开源许可", systemImage: "doc.text") }
+            }
             Section {
                 NavigationLink { AppUpdateView() } label: {
                     HStack { Label("软件更新", systemImage: "arrow.down.circle"); Spacer(); if model.updates.hasUpdate { Text("新版本").font(.caption).foregroundStyle(Color.dashBlue) } }
                 }.accessibilityIdentifier("softwareUpdate")
             }
-            Section {
-                Picker(selection: $appearance) {
-                    Text("跟随系统").tag("system"); Text("浅色").tag("light"); Text("深色").tag("dark")
-                } label: { Label("外观", systemImage: "circle.lefthalf.filled") }
-            }
-            Section("隐私与数据") {
-                NavigationLink { PrivacyView().toolbar(.visible, for: .navigationBar) } label: { Label("数据与隐私", systemImage: "hand.raised") }
-                NavigationLink { LicenseView().toolbar(.visible, for: .navigationBar) } label: { Label("开源许可", systemImage: "doc.text") }
-            }
-            Section {
-                LabeledContent("App 版本", value: DashConstants.appVersion)
-
-            }
         }.listSectionSpacing(.compact).contentMargins(.top, 8, for: .scrollContent).toolbar(.hidden, for: .navigationBar).accessibilityIdentifier("settingsPage")
+            .onChange(of: subscriptions.intervalRaw) { _, _ in model.startSubscriptionUpdates(restart: true) }
+            .onChange(of: latencyEndpoint) { _, _ in
+                model.invalidateDelayMeasurements(reason: "测速目标已更改，以下为上次目标的结果")
+            }
     }
 }
 
@@ -33,7 +46,7 @@ struct PrivacyView: View {
         List {
             Section("保存在本机") { Text("订阅地址、原始配置和运行配置使用 AES-GCM 加密。密钥保存在系统 Keychain。配置元数据和版本列表保存在受保护的应用容器中。").font(.subheadline) }
             Section("网络数据") { Text("流量会按你导入的配置发送到相应的节点、DNS 服务和远程规则来源。订阅及节点服务仍会收到建立连接所需的数据。").font(.subheadline) }
-            Section("首页检查与更新") { Text("连接后，首页会向 Cloudflare 查询本次检测的出口 IP，并检查 Google、YouTube、OpenAI、Claude 的网页响应。软件更新只访问设置中指定的公共 GitHub 仓库；不会上传订阅或节点凭据。更新通知需要你单独开启。").font(.subheadline) }
+            Section("首页检查与更新") { Text("连接后，首页会向 Cloudflare 查询本次检测的出口 IP，并检查 Google、YouTube、OpenAI、Claude 的网页响应。订阅自动更新按设定频率访问已保存的订阅来源，关闭后可手动更新。软件更新只访问设置中指定的公共 GitHub 仓库；不会上传订阅或节点凭据。更新通知需要你单独开启。").font(.subheadline) }
             Section("诊断与分享") { Text("App 未接入广告或行为分析。诊断摘要在本机生成；只有你主动打开系统分享时才会交给你选择的目标。原始 YAML 可能包含密码，请谨慎复制。").font(.subheadline) }
             Section("权限") { Text("基础连接只需要系统 VPN 授权和网络访问。不会在后台读取剪贴板，不需要通讯录、照片或位置权限。").font(.subheadline) }
         }.navigationTitle("数据与隐私")

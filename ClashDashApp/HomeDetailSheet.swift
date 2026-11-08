@@ -27,7 +27,7 @@ struct HomeDetailSheet: View {
                             Spacer()
                             if model.tunnel.state == .connected, let name = model.homeNode {
                                 Button { model.startDelayTests([name]) } label: { Image(systemName: "gauge.with.dots.needle.33percent").frame(width: 44, height: 44) }
-                                    .disabled(model.delayTests.isRunning).accessibilityLabel("测试节点延迟")
+                                    .disabled(model.delayTestBusy).accessibilityLabel("测试节点延迟")
                             }
                         }
                     }

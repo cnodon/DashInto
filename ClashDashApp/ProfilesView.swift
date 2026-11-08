@@ -30,6 +30,7 @@ private struct SubscriptionListRow: View {
     @Environment(AppModel.self) private var model
     var profile: Profile
     private var running: Bool { model.tunnel.state == .connected && model.runningProfile?.id == profile.id }
+    private var selected: Bool { model.library.selectedProfileID == profile.id }
     private var updatePending: Bool { running && model.hasPendingUpdate }
     var body: some View {
         HStack(spacing: 12) {
@@ -40,15 +41,22 @@ private struct SubscriptionListRow: View {
                     VStack(alignment: .leading, spacing: 6) {
                         HStack(spacing: 5) {
                             Text(profile.name).font(.subheadline.weight(.semibold)).lineLimit(2)
-                            if running || model.library.selectedProfileID == profile.id {
-                                Image(systemName: running ? "checkmark.circle.fill" : "checkmark.circle")
-                                    .font(.caption).foregroundStyle(running ? Color.green : Color.dashBlue)
-                                    .accessibilityLabel(running ? "正在使用" : "下次使用")
-                            }
+                        }
+                        if running || selected {
+                            HStack(spacing: 3) {
+                                Image(systemName: "checkmark.circle.fill")
+                                Text(running ? "使用中" : "已选中").accessibilityIdentifier("selectionMark-" + profile.name)
+                            }.font(.caption2.weight(.semibold)).foregroundStyle(running ? Color.green : Color.dashBlue)
+                                .padding(.horizontal, 7).padding(.vertical, 3)
+                                .background((running ? Color.green : Color.dashBlue).opacity(0.1), in: Capsule())
                         }
                         if let balance = SubscriptionBalance(usage: profile.usage) {
                             Text(DashFormat.bytes(balance.remaining) + " 剩余").font(.caption).monospacedDigit().foregroundStyle(.secondary)
                         } else { Text(profile.current?.summary.routeCountText ?? "已保存").font(.caption).foregroundStyle(.secondary) }
+                        if profile.refreshState?.outcome == .failed {
+                            Label("更新失败 · 保留原配置", systemImage: "exclamationmark.circle")
+                                .font(.caption2).foregroundStyle(.orange)
+                        }
                         HStack(spacing: 8) {
                             Label { Text(profile.updatedAt, style: .relative) } icon: { Image(systemName: "arrow.clockwise") }
                             if let expiry = profile.usage?.expiresAt {
@@ -59,6 +67,7 @@ private struct SubscriptionListRow: View {
                     }
                 }.padding(.vertical, 6)
             }.accessibilityIdentifier("profileDetail-" + profile.name)
+                .accessibilityAddTraits(selected ? .isSelected : [])
             Button { model.useAndConnect(profile) } label: {
                 Group {
                     if model.refreshingProfileID == profile.id || model.connection.targetID == profile.id && model.connection.step.inProgress { ProgressView().controlSize(.small) }
@@ -68,7 +77,7 @@ private struct SubscriptionListRow: View {
             }.buttonStyle(.borderless).disabled(model.connection.step.inProgress || model.busy || (running && !updatePending))
                 .accessibilityLabel(updatePending ? "应用并重连" : running ? "正在使用" : "使用并连接")
                 .accessibilityIdentifier("useProfile-" + profile.name)
-        }
+        }.listRowBackground((selected || running) ? Color.dashBlue.opacity(0.06) : Color(uiColor: .secondarySystemGroupedBackground))
     }
 }
 
@@ -87,6 +96,19 @@ struct ProfileDetailView: View {
                     SubscriptionBalanceView(profile: profile)
                     LabeledContent("节点", value: profile.current?.summary.routeCountText ?? "已保存")
                     LabeledContent("更新时间") { Text(profile.updatedAt, format: .dateTime.month().day().hour().minute()) }
+                    if profile.isSubscription {
+                        LabeledContent("自动更新", value: model.subscriptionUpdates.interval.title)
+                        if let refresh = profile.refreshState {
+                            LabeledContent("上次尝试") { Text(refresh.attemptedAt, format: .dateTime.month().day().hour().minute()) }
+                            if refresh.outcome == .failed { Text("更新失败，仍保留上次可用配置。可手动重试。").font(.caption).foregroundStyle(.orange) }
+                            else if refresh.outcome == .cancelled || refresh.outcome == .pending, model.refreshingProfileID != profile.id {
+                                Text("上次更新未完成，原配置已保留。").font(.caption).foregroundStyle(.secondary)
+                            }
+                        }
+                        if model.runningProfile?.id == profile.id && model.hasPendingUpdate {
+                            Label("新配置将在重连后生效", systemImage: "arrow.clockwise").font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
                 }
                 Section {
                     Button(model.tunnel.phase == .stopped ? "使用并连接" : "切换并重连") { model.useAndConnect(profile) }
@@ -134,6 +156,8 @@ struct ImportView: View {
     @State private var filePicker = false
     @State private var work: Task<Void, Never>?
     @State private var pastedContent = ""
+    @State private var confirmingHTTP = false
+    @State private var pendingHTTPAddress: String?
     var body: some View {
         NavigationStack {
             Form {
@@ -143,7 +167,7 @@ struct ImportView: View {
                 if loading { Section { HStack { ProgressView(); Text(stage).font(.subheadline) } } }
                 if prepared == nil {
                     Section {
-                        TextField("https://你的订阅地址", text: $address).keyboardType(.URL).textInputAutocapitalization(.never).autocorrectionDisabled()
+                        TextField("HTTP / HTTPS 订阅地址", text: $address).keyboardType(.URL).textInputAutocapitalization(.never).autocorrectionDisabled()
                             .accessibilityIdentifier("subscriptionURL")
                         HStack {
                             Label("自动识别订阅格式", systemImage: "link").font(.subheadline).foregroundStyle(.secondary)
@@ -179,7 +203,8 @@ struct ImportView: View {
                         LabeledContent("静态节点", value: "\(prepared.summary.nodes.count)")
                         LabeledContent("代理组", value: "\(prepared.summary.groups.count)")
                         LabeledContent("规则", value: "\(prepared.summary.rules.count)")
-                        LabeledContent("远程资源", value: "\(prepared.summary.providerCount)")
+                        LabeledContent("远程资源", value: "\(prepared.summary.remoteResourceCount ?? prepared.summary.providerCount)")
+                        if let count = prepared.summary.inlineResourceCount, count > 0 { LabeledContent("内联资源", value: "\(count)") }
 
                         Text("导入检查通过，连接后验证网络可达性。").font(.caption).foregroundStyle(.secondary)
                         ForEach(prepared.summary.warnings, id: \.self) { warning in Text(warning).font(.subheadline).foregroundStyle(.secondary) }
@@ -211,6 +236,14 @@ struct ImportView: View {
                 .scrollDismissesKeyboard(.interactively)
                 .onAppear { address = initialURL }
                 .onDisappear { work?.cancel() }
+                .alert("使用未加密的订阅？", isPresented: $confirmingHTTP) {
+                    Button("取消", role: .cancel) { pendingHTTPAddress = nil }
+                    Button("继续导入") {
+                        guard let approved = pendingHTTPAddress else { return }
+                        pendingHTTPAddress = nil
+                        readSubscription(approvedHTTPAddress: approved)
+                    }
+                } message: { Text("此地址使用 HTTP，下载内容可能被查看或修改。确认后，仅对此订阅使用 HTTP；请优先使用服务商提供的 HTTPS 地址。") }
                 .fileImporter(isPresented: $filePicker, allowedContentTypes: [.yaml, .json, .plainText, .data]) { result in
                     switch result {
                     case .success(let url):
@@ -226,16 +259,19 @@ struct ImportView: View {
                 }
         }
     }
-    private func readSubscription() {
+    private func readSubscription(approvedHTTPAddress: String? = nil) {
         let trimmed = address.trimmingCharacters(in: .whitespacesAndNewlines)
         if ImportAddress.isNodeLink(trimmed) { prepare(trimmed, proposedName: "我的节点"); return }
+        if let url = try? ImportAddress.subscriptionURL(from: trimmed), url.scheme?.lowercased() == "http", approvedHTTPAddress != trimmed {
+            pendingHTTPAddress = trimmed; confirmingHTTP = true; return
+        }
         error = nil; loading = true; stage = "读取订阅"
         work?.cancel()
         work = Task {
             defer { loading = false }
             do {
                 let url = try ImportAddress.subscriptionURL(from: trimmed)
-                let download = try await SubscriptionClient().download(url)
+                let download = try await SubscriptionClient().download(url, allowInsecureHTTP: approvedHTTPAddress == trimmed)
                 try Task.checkCancellation(); stage = "识别线路"
                 let parsed = try await Task.detached { try NativeConfigImporter.prepare(download.text) }.value
                 try Task.checkCancellation()

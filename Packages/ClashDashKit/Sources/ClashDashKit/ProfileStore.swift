@@ -101,12 +101,36 @@ public actor ProfileStore {
     }
     public func importConfiguration(_ prepared: PreparedConfiguration, name: String, sourceURL: URL? = nil,
                                     replacing profileID: UUID? = nil, usage: SubscriptionUsage? = nil,
-                                    selectIfEmpty: Bool = true, retaining generations: [String] = []) throws -> ProfileLibrary {
+                                    selectIfEmpty: Bool = true, retaining generations: [String] = [], expectedVersion: String? = nil) throws -> ProfileLibrary {
+        try Task.checkCancellation()
         var state = try library()
+        if let expectedVersion {
+            guard let profileID, state.profiles.contains(where: { $0.id == profileID && $0.selectedVersion == expectedVersion }) else {
+                throw DashError.message("订阅已改变或删除，更新未覆盖当前配置。")
+            }
+        }
         let id = profileID ?? UUID(); let generation = UUID().uuidString
         guard Set(prepared.resourceRequests.map(\.relativePath)) == Set(prepared.resources.map(\.relativePath)),
               prepared.resources.count == Set(prepared.resources.map(\.relativePath)).count else {
             throw DashError.message("远程资源尚未准备完成，配置未保存。")
+        }
+        if expectedVersion != nil, let index = state.profiles.firstIndex(where: { $0.id == id }),
+           state.profiles[index].current?.contentHash == prepared.hash {
+            let old = try envelope(profileID: id, generation: state.profiles[index].selectedVersion)
+            let resources = Dictionary(uniqueKeysWithValues: prepared.resources.map {
+                ($0.relativePath, SHA256.hash(data: $0.data).map { String(format: "%02x", $0) }.joined())
+            })
+            let oldResources = Dictionary(uniqueKeysWithValues: (old.resources ?? []).map { ($0.relativePath, $0.hash) })
+            let geodata = Dictionary(uniqueKeysWithValues: prepared.geodata.map { ($0.relativePath, $0.hash) })
+            let oldGeodata = Dictionary(uniqueKeysWithValues: (old.geodata ?? []).map { ($0.relativePath, $0.hash) })
+            if old.runtime == prepared.runtime, old.sourceURL == sourceURL?.absoluteString, resources == oldResources, geodata == oldGeodata {
+                try Task.checkCancellation()
+                state.profiles[index].updatedAt = Date()
+                state.profiles[index].usage = usage
+                state.profiles[index].refreshState = .init(attemptedAt: state.profiles[index].refreshState?.attemptedAt ?? Date(), outcome: .succeeded)
+                try saveLibrary(state)
+                return state
+            }
         }
         try ensureRoot()
         var envelope = ConfigurationEnvelope(original: prepared.original, runtime: prepared.runtime, sourceURL: sourceURL?.absoluteString)
@@ -146,10 +170,14 @@ public actor ProfileStore {
             state.profiles[index].versions.removeAll { !keep.contains($0.id) }
             state.profiles[index].selectedVersion = generation; state.profiles[index].updatedAt = Date()
             state.profiles[index].usage = usage
+            if expectedVersion != nil {
+                state.profiles[index].refreshState = .init(attemptedAt: state.profiles[index].refreshState?.attemptedAt ?? Date(), outcome: .succeeded)
+            }
         } else {
             state.profiles.append(Profile(id: id, name: name, isSubscription: sourceURL != nil, sourceHost: sourceURL?.host, version: version, usage: usage))
         }
         if selectIfEmpty && state.selectedProfileID == nil { state.selectedProfileID = id }
+        try Task.checkCancellation()
         try saveLibrary(state)
         return state
     }
@@ -218,6 +246,14 @@ public actor ProfileStore {
         var state = try library()
         guard let index = state.profiles.firstIndex(where: { $0.id == profileID }) else { throw DashError.message("找不到配置。") }
         state.profiles[index].preferredMode = mode; try saveLibrary(state); return state
+    }
+    public func recordRefresh(profileID: UUID, expectedVersion: String, state refresh: SubscriptionRefreshState) throws -> ProfileLibrary {
+        var state = try library()
+        guard let index = state.profiles.firstIndex(where: { $0.id == profileID && $0.selectedVersion == expectedVersion }) else {
+            throw DashError.message("订阅已改变或删除。")
+        }
+        state.profiles[index].refreshState = refresh
+        try saveLibrary(state); return state
     }
     public func rename(profileID: UUID, name: String) throws -> ProfileLibrary {
         var state = try library()

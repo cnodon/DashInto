@@ -1,0 +1,64 @@
+{
+  "app": "DashInto",
+  "version": "0.5.0",
+  "build": 15,
+  "date": "2026-11-04",
+  "features": [
+    "Per-batch delay report, timestamps, failure retry, unfinished resume",
+    "Frozen display order during preparation and testing",
+    "Cloudflare / Google HTTPS latency targets",
+    "Bounded core readiness and network checks",
+    "Invalidate stale health and latency evidence after recovery or physical path revision",
+    "Refresh homepage runtime and diagnostics without subscription download"
+  ],
+  "validation": {
+    "releaseUnitTestsPassed": 79,
+    "simulatorUITestsPassed": 2,
+    "simulatorScope": [
+      "Report filter, offline failed retry feedback, target picker",
+      "Import / select / connect failure / persisted mode and node / latency sort regression"
+    ],
+    "uiRuns": "Existing flow passed in ui-final run; new report test passed in ui-filter rerun. Earlier new-test failures were ambiguous background sheet queries and tapping the labelled switch row instead of nested UISwitch. Test locator fixed; failures retained in logs.",
+    "realPinnedCoreLoopback": [
+      "preparation to 12-node batch",
+      "12-node batch",
+      "nested group 12 unique nodes",
+      "unresponsive target 3/3 completed",
+      "cancel and immediate retry 12 nodes"
+    ],
+    "corePlatform": "macOS local userspace SDK and independent local mihomo server, synthetic SS configuration; not iPhone VPN",
+    "releaseBuild": "passed",
+    "signing": "app and packet tunnel verified",
+    "releaseDebugEntryStrings": "UI result seed and device-validation launch flags absent",
+    "visualReview": "Final report screenshot inspected; synthetic data explicitly labelled",
+    "diffWhitespace": "passed"
+  },
+  "limits": [
+    "Subsequent user-authorized installation and launch passed; no phone VPN or stability testing",
+    "Physical Wi-Fi/cellular switching, lock/background recovery, soak and battery/memory trends not tested",
+    "Startup timeout bounds readiness after driver.connect, not system authorization",
+    "Current batch report is not persistent history; retries start new batch",
+    "No automatic subscription update, On Demand UI, backup or rule override UI implemented"
+  ],
+  "commitOrPush": "not performed",
+  "evidence": {
+    "unit": ".build/experience-050-unit-final.log",
+    "core": ".build/experience-050-core.log",
+    "existingFlowUI": ".build/experience-050-ui-final.log",
+    "reportUI": ".build/experience-050-ui-filter.log",
+    "release": ".build/experience-050-release-final.log",
+    "signing": ".build/experience-050-signing.json",
+    "screenshot": "docs/screenshots/delay-results-050.png",
+    "install": ".build/install-050-result.json",
+    "launch": ".build/install-050-launch.json",
+    "readback": ".build/install-050-version.json"
+  },
+  "phone": {
+    "device": "PKR",
+    "install": "passed_in_place",
+    "launch": "passed",
+    "readback": "0.5.0 (15)",
+    "date": "2026-11-04",
+    "vpnActions": "none"
+  }
+}

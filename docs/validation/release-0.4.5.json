@@ -1,0 +1,53 @@
+{
+  "app": "DashInto",
+  "version": "0.4.5",
+  "build": 9,
+  "date": "2026-10-30",
+  "problem": "全部测速没有反应或一直不结束；手机上的唯一根因尚未证实",
+  "regressionBeforeFix": {
+    "missingReplyQueueNeverFinished": "reproduced_in_optimized_unit_test",
+    "evidence": ".build/delay-recovery-before.log"
+  },
+  "unitTests": {
+    "configuration": "Release",
+    "passed": 57,
+    "failed": 0
+  },
+  "simulatorUITests": {
+    "passed": 5,
+    "failed": 0,
+    "scope": "Existing import, offline routing, tabs, settings/update entry and read-only dashboard preview; no simulated VPN success"
+  },
+  "realCoreLoopbackTests": {
+    "configuration": "Release",
+    "sdk": "v1.19.33-clash.3",
+    "syntheticSSNodes": 12,
+    "bulk": "passed",
+    "unresponsiveTargetThreeProbes": "finished_with_failure",
+    "cancelAndImmediateRetry": "passed",
+    "createsSystemVPN": false,
+    "usesPrivateSubscription": false
+  },
+  "releaseBuild": "passed",
+  "appAndExtensionSigning": "passed",
+  "timeoutsSeconds": {
+    "coreURLTest": 5,
+    "delayIPC": 12,
+    "queueFinalGuardPerNode": 15
+  },
+  "concurrency": {
+    "coreCalls": 3,
+    "maxOutstandingIncludingWaiting": 6
+  },
+  "physicalDeviceActions": "none_user_phone_control_restriction_preserved",
+  "physicalValidation": "not_run",
+  "lastPhysicalInstalledVersion": "0.4.4 (8)",
+  "commitOrPush": "not_requested_this_turn",
+  "evidence": {
+    "unit": ".build/delay-repair-045-unit.log",
+    "ui": ".build/delay-repair-045-ui.log",
+    "core": ".build/delay-repair-045-core.log",
+    "release": ".build/delay-repair-045-release-final.log",
+    "signing": ".build/delay-repair-045-signing.json"
+  }
+}

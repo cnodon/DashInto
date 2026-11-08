@@ -84,13 +84,14 @@ private final class TunnelEngine: NSObject, ClashPlatformInterfaceProtocol, @unc
     private let sessionID = UUID().uuidString
     private let queue = DispatchQueue(label: "app.clashdash.core", qos: .userInitiated)
     private let pathQueue = DispatchQueue(label: "app.clashdash.path")
-    private let probeQueue = DispatchQueue(label: "app.clashdash.probes", qos: .utility, attributes: .concurrent)
+    private let probeQueue = ProbeWorkQueue()
     private let lock = NSLock()
     private let lifecycle = ProviderLifecycle()
     private var service: ClashBoxService?
     private var bridge: PacketFlowBridge?
     private var monitor: ApplePhysicalPathMonitor?
     private var path: PhysicalPathSnapshot?
+    private var networkRevision = 0
     private var listener: (any ClashInterfaceUpdateListenerProtocol)?
     private var startedAt = Date()
     private var recentEvents: [String] = []
@@ -98,7 +99,6 @@ private final class TunnelEngine: NSObject, ClashPlatformInterfaceProtocol, @unc
     private var responseOrder: [UUID] = []
     private var tunnelAddresses = Set<String>()
     private var isStopping = false
-    private var activeProbes = 0
     private var workingDirectory: URL?
     private var temporaryDirectory: URL?
     private let log = Logger(subsystem: "app.clashdash.ios", category: "Tunnel")
@@ -114,7 +114,13 @@ private final class TunnelEngine: NSObject, ClashPlatformInterfaceProtocol, @unc
                 let pathMonitor = ApplePhysicalPathMonitor()
                 pathMonitor.updateHandler = { [weak self] snapshot in
                     guard let self else { return }
-                    self.lock.lock(); self.path = snapshot; let target = self.listener; self.lock.unlock()
+                    self.lock.lock()
+                    if let previous = self.path,
+                       previous.interfaceIndex != snapshot.interfaceIndex || previous.isReady != snapshot.isReady ||
+                       previous.supportsIPv4 != snapshot.supportsIPv4 || previous.supportsIPv6 != snapshot.supportsIPv6 ||
+                       previous.gateways != snapshot.gateways { self.networkRevision += 1 }
+                    self.path = snapshot; let target = self.listener
+                    self.lock.unlock()
                     if snapshot.isReady { pathReady.signal() }
                     target?.updateDefaultInterface(snapshot.interfaceName, interfaceIndex: Int32(bitPattern: snapshot.interfaceIndex),
                                                    isExpensive: snapshot.expensive, isConstrained: snapshot.constrained,
@@ -300,8 +306,9 @@ private final class TunnelEngine: NSObject, ClashPlatformInterfaceProtocol, @unc
                 if let cached = responses[request.requestID] { completion(cached); return }
                 switch request.method {
                 case "snapshot":
+                    lock.lock(); let revision = networkRevision; lock.unlock()
                     let info = RuntimeInfo(sessionID: sessionID, generation: generation, startedAt: startedAt, coreVersion: ClashVersion(), mode: service.mode(),
-                                           memoryBytes: UInt64(max(ClashMemoryFootprint(), 0)), trafficJSON: ClashTrafficJSON(), statusJSON: ClashStatusJSON())
+                                           memoryBytes: UInt64(max(ClashMemoryFootprint(), 0)), trafficJSON: ClashTrafficJSON(), statusJSON: ClashStatusJSON(), networkRevision: revision)
                     reply.payload = try JSONEncoder().encode(info)
                 case "proxies": reply.payload = Data(ClashProxiesJSON().utf8)
                 case "connections": reply.payload = Data(ClashConnectionsJSON().utf8)
@@ -332,20 +339,18 @@ private final class TunnelEngine: NSObject, ClashPlatformInterfaceProtocol, @unc
         queue.async(execute: operation)
     }
     private func handleProbe(_ request: TunnelRequest, completion: @escaping (Data?) -> Void) {
-        lock.lock()
-        let admitted = activeProbes < 3 && !isStopping
-        if admitted { activeProbes += 1 }
-        lock.unlock()
-        guard admitted else {
-            completion(try? JSONEncoder().encode(TunnelReply(requestID: request.requestID, sessionID: sessionID, generation: generation, error: "已有三个测速任务，请稍后重试。")))
-            return
-        }
-        probeQueue.async { [self] in
-            defer { lock.lock(); activeProbes -= 1; lock.unlock() }
+        // Allow one replacement batch to wait for canceled in-flight core calls (at most 5s).
+        // The core URLTest API is synchronous and has no cancellation handle.
+        let admitted = !stopping && probeQueue.submit(operation: { [self] in
             var reply = TunnelReply(requestID: request.requestID, sessionID: sessionID, generation: generation)
             if request.protocolVersion != DashConstants.protocolVersion || (request.sessionID != nil && request.sessionID != sessionID) || lifecycle.state != .running {
                 reply.error = "连接会话已改变，请刷新后重试。"
             } else if let name = request.parameters["name"] {
+                let endpoint = LatencyTestEndpoint(rawValue: request.parameters["endpoint"] ?? "cloudflare")
+                guard let endpoint else {
+                    reply.error = "不支持的测速目标。"
+                    return try? JSONEncoder().encode(reply)
+                }
                 #if DEBUG
                 if request.method == "validation-udp" {
                     let query: [String: Any] = ["domain": "www.apple.com", "protocol": "udp", "server": "udp://1.1.1.1:53#" + name, "types": ["A"], "timeoutMilliseconds": 10000]
@@ -355,15 +360,18 @@ private final class TunnelEngine: NSObject, ClashPlatformInterfaceProtocol, @unc
                     let code = (result["error"] as? [String: Any])?["code"] as? String ?? ""
                     reply.payload = try? JSONSerialization.data(withJSONObject: ["passed": passed, "errorCode": code])
                 } else {
-                    let delay = ClashURLTest(name, "https://cp.cloudflare.com/generate_204")
+                    let delay = ClashURLTest(name, endpoint.url)
                     reply.payload = try? JSONSerialization.data(withJSONObject: ["delay": delay])
                 }
                 #else
-                let delay = ClashURLTest(name, "https://cp.cloudflare.com/generate_204")
+                let delay = ClashURLTest(name, endpoint.url)
                 reply.payload = try? JSONSerialization.data(withJSONObject: ["delay": delay])
                 #endif
             } else { reply.error = "缺少节点名称。" }
-            completion(try? JSONEncoder().encode(reply))
+            return try? JSONEncoder().encode(reply)
+        }, completion: { completion($0) })
+        if !admitted {
+            completion(try? JSONEncoder().encode(TunnelReply(requestID: request.requestID, sessionID: sessionID, generation: generation, error: "上次测速尚在结束，请稍后重试。")))
         }
     }
 }

@@ -12,6 +12,7 @@ public final class SubscriptionClient: NSObject, URLSessionTaskDelegate, @unchec
         var result = input; result.resources = []; var total = 0
         for request in input.resourceRequests {
             try Task.checkCancellation()
+            try SubscriptionTransport.validate(request.url)
             let configuration = URLSessionConfiguration.ephemeral
             configuration.timeoutIntervalForRequest = 15; configuration.timeoutIntervalForResource = 45
             let session = URLSession(configuration: configuration, delegate: self, delegateQueue: nil)
@@ -35,14 +36,13 @@ public final class SubscriptionClient: NSObject, URLSessionTaskDelegate, @unchec
         }
         return result
     }
-    public func download(_ url: URL) async throws -> SubscriptionDownload {
-        guard url.scheme?.lowercased() == "https", url.host != nil, url.user == nil, url.password == nil else {
-            throw DashError.message("请输入 HTTPS 订阅地址。地址应指向 Clash / mihomo 配置。")
-        }
+    public func download(_ url: URL, allowInsecureHTTP: Bool = false) async throws -> SubscriptionDownload {
+        try SubscriptionTransport.validate(url, allowInsecureHTTP: allowInsecureHTTP)
         let configuration = URLSessionConfiguration.ephemeral
         configuration.timeoutIntervalForRequest = 15; configuration.timeoutIntervalForResource = 45
         configuration.urlCache = nil
-        let session = URLSession(configuration: configuration, delegate: self, delegateQueue: nil)
+        let redirects = SubscriptionRedirectDelegate(origin: allowInsecureHTTP && url.scheme?.lowercased() == "http" ? url : nil)
+        let session = URLSession(configuration: configuration, delegate: redirects, delegateQueue: nil)
         defer { session.invalidateAndCancel() }
         var request = URLRequest(url: url)
         request.setValue("ClashDash/0.1 mihomo", forHTTPHeaderField: "User-Agent")
@@ -66,13 +66,17 @@ public final class SubscriptionClient: NSObject, URLSessionTaskDelegate, @unchec
     }
     public func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
                            newRequest request: URLRequest, completionHandler: @escaping (URLRequest?) -> Void) {
-        guard request.url?.scheme?.lowercased() == "https", task.countOfBytesReceived <= DashConstants.maximumConfigurationBytes else {
-            completionHandler(nil); return
-        }
-        var safe = request
-        if response.url?.host != request.url?.host {
-            safe.setValue(nil, forHTTPHeaderField: "Authorization"); safe.setValue(nil, forHTTPHeaderField: "Cookie")
-        }
-        completionHandler(safe)
+        guard let source = response.url, task.countOfBytesReceived <= DashConstants.maximumConfigurationBytes else { completionHandler(nil); return }
+        completionHandler(SubscriptionTransport.redirect(request, from: source))
+    }
+}
+
+private final class SubscriptionRedirectDelegate: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
+    let origin: URL?
+    init(origin: URL?) { self.origin = origin }
+    func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
+                    newRequest request: URLRequest, completionHandler: @escaping (URLRequest?) -> Void) {
+        guard let source = response.url, task.countOfBytesReceived <= DashConstants.maximumConfigurationBytes else { completionHandler(nil); return }
+        completionHandler(SubscriptionTransport.redirect(request, from: source, approvedHTTPOrigin: origin))
     }
 }

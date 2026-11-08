@@ -56,6 +56,8 @@ public struct ProxyGroup: Codable, Identifiable, Hashable, Sendable {
 public struct ConfigurationSummary: Codable, Hashable, Sendable {
     public var sourceFormat: String?
     public var providerNodeCount: Int?
+    public var remoteResourceCount: Int?
+    public var inlineResourceCount: Int?
     public var nodes: [ProxyNode]
     public var groups: [ProxyGroup]
     public var rules: [String]
@@ -113,6 +115,7 @@ public struct Profile: Codable, Identifiable, Hashable, Sendable {
     public var usage: SubscriptionUsage?
     public var selections: [String: String]?
     public var preferredMode: RoutingMode?
+    public var refreshState: SubscriptionRefreshState?
     public var current: ProfileVersion? { versions.first { $0.id == selectedVersion } }
     public init(id: UUID = UUID(), name: String, isSubscription: Bool, sourceHost: String?,
                 version: ProfileVersion, usage: SubscriptionUsage? = nil) {
@@ -170,11 +173,12 @@ public struct RuntimeInfo: Codable, Sendable {
     public var memoryBytes: UInt64
     public var trafficJSON: String
     public var statusJSON: String
+    public var networkRevision: Int?
     public init(sessionID: String, generation: String, startedAt: Date, coreVersion: String, mode: String,
-                memoryBytes: UInt64, trafficJSON: String, statusJSON: String) {
+                memoryBytes: UInt64, trafficJSON: String, statusJSON: String, networkRevision: Int? = nil) {
         self.sessionID = sessionID; self.generation = generation; self.startedAt = startedAt
         self.coreVersion = coreVersion; self.mode = mode; self.memoryBytes = memoryBytes
-        self.trafficJSON = trafficJSON; self.statusJSON = statusJSON
+        self.trafficJSON = trafficJSON; self.statusJSON = statusJSON; self.networkRevision = networkRevision
     }
 }
 

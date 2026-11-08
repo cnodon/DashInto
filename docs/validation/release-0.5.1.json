@@ -1,0 +1,77 @@
+{
+  "app": "DashInto",
+  "version": "0.5.1",
+  "build": 16,
+  "date": "2026-11-04",
+  "features": {
+    "subscriptionRefresh": {
+      "default": "daily",
+      "options": [
+        "disabled",
+        "6 hours",
+        "12 hours",
+        "daily"
+      ],
+      "foreground": "due check every minute while active",
+      "background": "BGAppRefreshTask requested; execution time chosen by iOS",
+      "failureBackoffMinutes": 30,
+      "preparationTimeoutSeconds": 90,
+      "unchangedContent": "refresh usage and date only; compare runtime and resource hashes as well",
+      "runningTunnel": "not reconnected; running revision retained",
+      "persistence": "optional Profile.refreshState; source remains encrypted; no error URL stored"
+    },
+    "nodeSort": {
+      "options": [
+        "configuration",
+        "latency ascending",
+        "natural name"
+      ],
+      "preference": "existing global AppStorage proxyNodeSortOrder",
+      "appliesTo": [
+        "proxy list",
+        "group detail"
+      ],
+      "doesNotChange": [
+        "node selection",
+        "routing order",
+        "subscription source"
+      ]
+    }
+  },
+  "validation": {
+    "releaseUnitTestsPassed": 90,
+    "simulatorUITestsPassed": 2,
+    "uiScope": [
+      "automatic update frequency and name sort persist across relaunch",
+      "original import, selection, modes, latency sorting and offline feedback regression"
+    ],
+    "releaseBuild": "passed",
+    "appAndExtensionSigning": "passed",
+    "screenshotReviewed": "docs/screenshots/subscription-schedule-051.png",
+    "initialTestIssue": "One new assertion used download instead of SubscriptionUsage.downloaded; corrected before final 90-test pass"
+  },
+  "phone": {
+    "device": "PKR",
+    "install": "passed_in_place",
+    "launch": "passed",
+    "readback": "0.5.1 (16)",
+    "uninstalledOrReset": false,
+    "manualVPNActions": "none"
+  },
+  "limits": [
+    "Did not wait for actual iOS background scheduling",
+    "No new real subscription end-to-end network verification",
+    "Existing device subscriptions may update when due on app launch; completion was not read back",
+    "No repeated full protocol matrix or phone stability soak"
+  ],
+  "commitOrPush": "not performed",
+  "evidence": {
+    "unit": ".build/subscriptions-051-unit-final.log",
+    "ui": ".build/subscriptions-051-ui.log",
+    "build": ".build/subscriptions-051-release-final.log",
+    "signing": ".build/subscriptions-051-signing.json",
+    "install": ".build/install-051-result.json",
+    "launch": ".build/install-051-launch.json",
+    "readback": ".build/install-051-version.json"
+  }
+}

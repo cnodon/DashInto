@@ -1,0 +1,204 @@
+{
+  "proxies": [
+    {
+      "name": "Trojan",
+      "type": "trojan",
+      "server": "trojan.example.invalid",
+      "port": 443,
+      "password": "synthetic-fixture-only",
+      "sni": "example.invalid"
+    },
+    {
+      "name": "AnyTLS",
+      "type": "anytls",
+      "server": "anytls.example.invalid",
+      "port": 443,
+      "password": "synthetic-fixture-only",
+      "sni": "example.invalid"
+    },
+    {
+      "name": "Hysteria2",
+      "type": "hysteria2",
+      "server": "hy2.example.invalid",
+      "port": 443,
+      "password": "synthetic-fixture-only",
+      "sni": "example.invalid"
+    }
+  ],
+  "proxy-groups": [
+    {
+      "name": "Choose",
+      "type": "select",
+      "proxies": [
+        "Trojan",
+        "AnyTLS",
+        "Hysteria2"
+      ]
+    }
+  ],
+  "rule-providers": {
+    "Inline0": {
+      "type": "inline",
+      "behavior": "domain",
+      "payload": [
+        "rule0.example.invalid"
+      ]
+    },
+    "Inline1": {
+      "type": "inline",
+      "behavior": "domain",
+      "payload": [
+        "rule1.example.invalid"
+      ]
+    },
+    "Inline2": {
+      "type": "inline",
+      "behavior": "domain",
+      "payload": [
+        "rule2.example.invalid"
+      ]
+    },
+    "Inline3": {
+      "type": "inline",
+      "behavior": "domain",
+      "payload": [
+        "rule3.example.invalid"
+      ]
+    },
+    "Inline4": {
+      "type": "inline",
+      "behavior": "domain",
+      "payload": [
+        "rule4.example.invalid"
+      ]
+    },
+    "Inline5": {
+      "type": "inline",
+      "behavior": "domain",
+      "payload": [
+        "rule5.example.invalid"
+      ]
+    },
+    "Inline6": {
+      "type": "inline",
+      "behavior": "domain",
+      "payload": [
+        "rule6.example.invalid"
+      ]
+    },
+    "Inline7": {
+      "type": "inline",
+      "behavior": "domain",
+      "payload": [
+        "rule7.example.invalid"
+      ]
+    },
+    "Inline8": {
+      "type": "inline",
+      "behavior": "domain",
+      "payload": [
+        "rule8.example.invalid"
+      ]
+    },
+    "Inline9": {
+      "type": "inline",
+      "behavior": "domain",
+      "payload": [
+        "rule9.example.invalid"
+      ]
+    },
+    "Inline10": {
+      "type": "inline",
+      "behavior": "domain",
+      "payload": [
+        "rule10.example.invalid"
+      ]
+    },
+    "Inline11": {
+      "type": "inline",
+      "behavior": "domain",
+      "payload": [
+        "rule11.example.invalid"
+      ]
+    },
+    "Inline12": {
+      "type": "inline",
+      "behavior": "domain",
+      "payload": [
+        "rule12.example.invalid"
+      ]
+    },
+    "Inline13": {
+      "type": "inline",
+      "behavior": "domain",
+      "payload": [
+        "rule13.example.invalid"
+      ]
+    },
+    "Inline14": {
+      "type": "inline",
+      "behavior": "domain",
+      "payload": [
+        "rule14.example.invalid"
+      ]
+    },
+    "Inline15": {
+      "type": "inline",
+      "behavior": "domain",
+      "payload": [
+        "rule15.example.invalid"
+      ]
+    },
+    "Inline16": {
+      "type": "inline",
+      "behavior": "domain",
+      "payload": [
+        "rule16.example.invalid"
+      ]
+    },
+    "Inline17": {
+      "type": "inline",
+      "behavior": "domain",
+      "payload": [
+        "rule17.example.invalid"
+      ]
+    },
+    "Inline18": {
+      "type": "inline",
+      "behavior": "domain",
+      "payload": [
+        "rule18.example.invalid"
+      ]
+    },
+    "Inline19": {
+      "type": "inline",
+      "behavior": "domain",
+      "payload": [
+        "rule19.example.invalid"
+      ]
+    }
+  },
+  "rules": [
+    "RULE-SET,Inline0,Choose",
+    "RULE-SET,Inline1,Choose",
+    "RULE-SET,Inline2,Choose",
+    "RULE-SET,Inline3,Choose",
+    "RULE-SET,Inline4,Choose",
+    "RULE-SET,Inline5,Choose",
+    "RULE-SET,Inline6,Choose",
+    "RULE-SET,Inline7,Choose",
+    "RULE-SET,Inline8,Choose",
+    "RULE-SET,Inline9,Choose",
+    "RULE-SET,Inline10,Choose",
+    "RULE-SET,Inline11,Choose",
+    "RULE-SET,Inline12,Choose",
+    "RULE-SET,Inline13,Choose",
+    "RULE-SET,Inline14,Choose",
+    "RULE-SET,Inline15,Choose",
+    "RULE-SET,Inline16,Choose",
+    "RULE-SET,Inline17,Choose",
+    "RULE-SET,Inline18,Choose",
+    "RULE-SET,Inline19,Choose",
+    "MATCH,Choose"
+  ]
+}

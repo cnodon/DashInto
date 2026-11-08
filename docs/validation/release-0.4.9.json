@@ -1,0 +1,57 @@
+{
+  "app": "DashInto",
+  "version": "0.4.9",
+  "build": 13,
+  "date": "2026-11-02",
+  "rootCauseEvidence": {
+    "confirmedInCode": "Button disabled before handler when disconnected, missing runtime or empty targets; readiness refresh absent",
+    "userDeviceConnectionState": "not_confirmed",
+    "additionalRace": "First consumeSample could reset a batch started before session synchronization"
+  },
+  "changes": [
+    "Always responsive bulk test entry with persistent offline explanation and Home navigation",
+    "Visible cancellable readiness with 20-second deadline",
+    "Refresh snapshot and catalog before resolving all/group targets",
+    "Synchronize polling session before starting workers",
+    "Fence cancellation, timeout, late completion and changed connections"
+  ],
+  "unitTests": {
+    "configuration": "Release",
+    "passed": 69,
+    "failed": 0
+  },
+  "simulatorUI": {
+    "passed": 1,
+    "failed": 0,
+    "scope": "Import/select/restart/routes, offline bulk test feedback and explicit navigation without starting VPN",
+    "firstRun": "New test expected pre-relaunch failure status rather than post-relaunch disconnected; assertion corrected and rerun passed"
+  },
+  "realCoreLoopback": {
+    "nodes": 12,
+    "preparationToQueue": "passed",
+    "timeout": "passed",
+    "cancelAndRetry": "passed",
+    "platform": "macOS; not physical iPhone VPN"
+  },
+  "releaseBuild": "passed",
+  "signing": "passed",
+  "phone": {
+    "device": "PKR",
+    "install": "passed_in_place",
+    "launch": "passed",
+    "readback": "0.4.9 (13)",
+    "vpnActions": "none",
+    "realDeviceLatencyRetest": "not_performed"
+  },
+  "commitOrPush": "not_requested",
+  "evidence": {
+    "unit": ".build/delay-049-unit.log",
+    "ui": ".build/delay-049-ui-retry.log",
+    "core": ".build/delay-049-core.log",
+    "build": ".build/delay-049-release.log",
+    "signing": ".build/delay-049-signing.json",
+    "install": ".build/delay-049-install.json",
+    "launch": ".build/delay-049-launch.json",
+    "readback": ".build/delay-049-device-version.json"
+  }
+}

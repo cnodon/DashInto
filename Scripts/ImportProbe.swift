@@ -66,6 +66,13 @@ check("HTML and unsupported content do not become a usable profile") {
         catch {}
     }
 }
+check("Trojan AnyTLS Hysteria2 with twenty inline rule providers") {
+    let text = try String(contentsOf: root.appendingPathComponent("Fixtures/Imports/InlineRuleSubscription.json"), encoding: .utf8)
+    let result = try NativeConfigImporter.prepare(text)
+    try require(result.summary.nodes.map(\.kind) == ["trojan", "anytls", "hysteria2"])
+    try require(result.summary.inlineResourceCount == 20 && result.summary.remoteResourceCount == 0)
+    try require(result.resourceRequests.isEmpty && result.summary.rules.count == 21)
+}
 let report: [String: Any] = ["checks": checks, "passed": checks.allSatisfy { $0["passed"] as? Bool == true }, "supportedImportSchemes": NativeConfigImporter.supportedSchemes]
 let data = try JSONSerialization.data(withJSONObject: report, options: [.prettyPrinted, .sortedKeys])
 try data.write(to: root.appendingPathComponent(".build/ImportLab/result.json"))

@@ -1,0 +1,87 @@
+{
+  "app": "DashInto",
+  "version": "0.4.7",
+  "build": 11,
+  "date": "2026-11-02",
+  "subscriptionCompatibility": {
+    "source": "user-provided private HTTPS subscription",
+    "contentTypeHeader": "text/html; charset=utf-8",
+    "actualFormat": "Clash / mihomo YAML",
+    "nodeCount": 51,
+    "protocols": {
+      "trojan": 4,
+      "anytls": 43,
+      "hysteria2": 4
+    },
+    "groups": 18,
+    "rules": 23,
+    "inlineRuleProviders": 20,
+    "remoteDownloads": 0,
+    "productionDownloader": {
+      "groups": 18,
+      "inlineResources": 20,
+      "nodes": 51,
+      "passed": true,
+      "quotaProvided": true,
+      "usageParsed": true
+    },
+    "corePreflightAndEncryptedRoundtrip": true,
+    "rootCauseFixed": "Inline providers were incorrectly counted against the 16 remote-resource limit",
+    "limits": {
+      "remoteDownloads": 16,
+      "allProviders": 256,
+      "configurationBytes": 5242880
+    }
+  },
+  "delayTesting": {
+    "kind": "HTTPS response latency in milliseconds; not bandwidth",
+    "requiresConnectedVPNOnDevice": true,
+    "nestedGroupsExpandToUniqueRealNodes": true,
+    "routingActionsExcluded": true,
+    "oldSubscriptionResultsReset": true,
+    "cancelTimeoutAndRetry": "passed",
+    "realPinnedCoreLoopbackNodes": 12,
+    "newSubscriptionLiveNodeConnectivity": "not_tested"
+  },
+  "subscriptionSelection": {
+    "selected": "Blue badge and tinted row",
+    "connected": "Green in-use badge",
+    "selectionSurvivesRelaunch": "passed",
+    "saveOnlyKeepsPreviousSelection": "passed",
+    "screenshot": "docs/screenshots/subscription-selection-047.png"
+  },
+  "unitTests": {
+    "configuration": "Release",
+    "passed": 65,
+    "failed": 0
+  },
+  "simulatorUITests": {
+    "passed": 6,
+    "failed": 0
+  },
+  "syntheticImportChecks": {
+    "passed": 48,
+    "failed": 0,
+    "supportedShareSchemesIncludingAliases": 28
+  },
+  "localProtocolInterop": {
+    "passed": 12,
+    "failed": 0,
+    "platform": "macOS userland with separate loopback reference core; not iOS VPN"
+  },
+  "releaseBuild": "passed",
+  "appAndExtensionSigning": "passed",
+  "phoneActions": "none_this_turn",
+  "lastInstalledPhoneVersion": "0.4.6 (10)",
+  "commitOrPush": "not_requested",
+  "evidence": {
+    "unit": ".build/features-047-unit.log",
+    "ui": ".build/features-047-ui.log",
+    "imports": ".build/features-047-imports.log",
+    "productionDownload": ".build/features-047-real-download.log",
+    "delayCore": ".build/features-047-delay-core.log",
+    "protocols": ".build/features-047-protocols.log",
+    "release": ".build/features-047-release.log",
+    "signing": ".build/features-047-signing.json"
+  }
+}

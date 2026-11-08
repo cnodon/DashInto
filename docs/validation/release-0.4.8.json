@@ -1,0 +1,39 @@
+{
+  "app": "DashInto",
+  "version": "0.4.8",
+  "build": 12,
+  "date": "2026-11-02",
+  "changes": [
+    "Centered subscription and current/planned node",
+    "Adaptive monochrome connect button and red disconnect",
+    "Press, title and connection transitions with Reduce Motion support"
+  ],
+  "releaseBuild": "passed",
+  "appAndExtensionSigning": "passed",
+  "simulatorUITests": {
+    "passed": 3,
+    "failed": 0
+  },
+  "phone": {
+    "device": "PKR",
+    "install": "passed_in_place",
+    "readback": "0.4.8 (12)",
+    "launch": "passed_after_user_unlocked",
+    "vpnActions": "none",
+    "existingData": "no_uninstall_or_reset"
+  },
+  "screenshots": [
+    "docs/screenshots/home-centered-048.png",
+    "docs/screenshots/home-preview-048.png"
+  ],
+  "evidence": {
+    "ui": ".build/home-048-ui.log",
+    "build": ".build/home-048-release.log",
+    "signing": ".build/home-048-signing.json",
+    "install": ".build/home-048-install.json",
+    "launch": ".build/home-048-launch.json",
+    "readback": ".build/home-048-device-version.json",
+    "launchAfterUnlock": ".build/home-048-launch-unlocked.json"
+  },
+  "commitOrPush": "not_requested"
+}

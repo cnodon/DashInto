@@ -1,0 +1,42 @@
+{
+  "app": "DashInto",
+  "version": "0.4.10",
+  "build": 14,
+  "date": "2026-11-02",
+  "feature": "Node latency sorting in proxy list and group detail",
+  "behavior": {
+    "orders": [
+      "configuration",
+      "latency ascending"
+    ],
+    "ties": "stable original order",
+    "negativeAndMissing": "last, stable original order",
+    "routingActionsAndGroups": "not ranked using their delay history",
+    "preference": "shared AppStorage proxyNodeSortOrder",
+    "selectionAndConfiguration": "unchanged"
+  },
+  "validation": {
+    "releaseUnitTestsPassed": 71,
+    "simulatorUITestsPassed": 1,
+    "simulatorScope": "Sort menu selection, shared preference in group detail, reset to default, existing route/measurement feedback flow",
+    "releaseBuild": "passed",
+    "signing": "passed"
+  },
+  "phone": {
+    "device": "PKR",
+    "install": "passed_in_place",
+    "launch": "passed",
+    "readback": "0.4.10 (14)",
+    "vpnActions": "none"
+  },
+  "commitOrPush": "not_requested",
+  "evidence": {
+    "unit": ".build/sort-0410-unit.log",
+    "ui": ".build/sort-0410-ui.log",
+    "build": ".build/sort-0410-release.log",
+    "signing": ".build/sort-0410-signing.json",
+    "install": ".build/sort-0410-install.json",
+    "launch": ".build/sort-0410-launch.json",
+    "readback": ".build/sort-0410-device-version.json"
+  }
+}

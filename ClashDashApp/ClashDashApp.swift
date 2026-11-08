@@ -11,14 +11,19 @@ struct ClashDashApp: App {
                 .preferredColorScheme(appearance == "dark" ? .dark : appearance == "light" ? .light : nil)
                 .task {
                     guard !DashboardPresentation.preview else { return }
-                    await model.load(); model.resume()
+                    await model.load()
+                    #if DEBUG && targetEnvironment(simulator)
+                    if DashboardPresentation.delayResults { await model.seedDelayResultsForUITest(); return }
+                    if AppModel.automaticRefreshUITest { await model.seedBlockedRefreshForUITest(); return }
+                    #endif
+                    model.resume()
                     Task { await model.updates.check() }
                     #if DEBUG
                     await DeviceValidation.runIfRequested(model)
                     #endif
                 }
                 .onChange(of: scenePhase) { _, phase in
-                    guard !DashboardPresentation.preview else { return }
+                    guard !DashboardPresentation.preview && !DashboardPresentation.delayResults && !AppModel.automaticRefreshUITest else { return }
                     if phase == .active { Task { await model.load(); model.resume(); await model.updates.check() } }
                     else if phase == .background { model.suspend(); model.updates.scheduleBackgroundCheck() }
                 }
@@ -27,6 +32,11 @@ struct ClashDashApp: App {
                           let value = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.first(where: { $0.name == "url" })?.value else { return }
                     model.importURL = value; model.showingImport = true
                 }
+        }
+        .backgroundTask(.appRefresh(SubscriptionUpdates.backgroundID)) {
+            await model.load()
+            await model.refreshDueSubscriptions()
+            await model.subscriptionUpdates.schedule(profiles: model.library.profiles)
         }
         .backgroundTask(.appRefresh(AppUpdates.backgroundID)) {
             await model.updates.check()
@@ -71,6 +81,15 @@ struct RootView: View {
 }
 
 private enum DashboardPresentation {
+    static var delayResults: Bool {
+        #if DEBUG && targetEnvironment(simulator)
+        CommandLine.arguments.contains("--ui-test-delay-results") && CommandLine.arguments.contains {
+            $0.hasPrefix("--ui-test-library=") && UUID(uuidString: String($0.dropFirst("--ui-test-library=".count))) != nil
+        }
+        #else
+        false
+        #endif
+    }
     static var preview: Bool {
         #if DEBUG && targetEnvironment(simulator)
         return CommandLine.arguments.contains("--ui-test-dashboard-preview") && CommandLine.arguments.contains { value in

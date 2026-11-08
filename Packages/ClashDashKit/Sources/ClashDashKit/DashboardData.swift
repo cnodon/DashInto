@@ -1,7 +1,85 @@
 import Foundation
 import Network
 
+public enum ProxyNodeSortOrder: String, CaseIterable, Sendable {
+    case configuration, latency, name
+    public var title: String {
+        switch self { case .configuration: "默认顺序"; case .latency: "延迟从低到高"; case .name: "名称排序" }
+    }
+    public var shortTitle: String {
+        switch self { case .configuration: "默认"; case .latency: "延迟"; case .name: "名称" }
+    }
+
+    /// Equal latency and unknown results keep their original subscription order.
+    public func sorted(_ names: [String], delays: [String: Int]) -> [String] {
+        if self == .name {
+            return names.enumerated().sorted {
+                let comparison = $0.element.localizedStandardCompare($1.element)
+                return comparison == .orderedSame ? $0.offset < $1.offset : comparison == .orderedAscending
+            }.map(\.element)
+        }
+        guard self == .latency else { return names }
+        return names.enumerated().sorted { lhs, rhs in
+            let left = delays[lhs.element].flatMap { $0 >= 0 ? $0 : nil }
+            let right = delays[rhs.element].flatMap { $0 >= 0 ? $0 : nil }
+            switch (left, right) {
+            case let (a?, b?) where a != b: return a < b
+            case (_?, nil): return true
+            case (nil, _?): return false
+            default: return lhs.offset < rhs.offset
+            }
+        }.map(\.element)
+    }
+}
+
+public struct ProxyRouteChoice: Equatable, Sendable {
+    public let group: String
+    public let member: String
+    public init(group: String, member: String) { self.group = group; self.member = member }
+}
+
 public enum ProxySelection {
+    /// Only manual selector chains can promise the requested leaf. Automatic groups are opaque.
+    public static func manualPath(to node: String, from root: String, groups: [ProxyGroup]) -> [ProxyRouteChoice]? {
+        let catalog = Dictionary(groups.map { ($0.name, $0) }, uniquingKeysWith: { _, new in new })
+        func visit(_ name: String, visited: Set<String>) -> [ProxyRouteChoice]? {
+            guard !visited.contains(name), let group = catalog[name], group.isSelectable else { return nil }
+            if group.members.contains(node) { return [.init(group: name, member: node)] }
+            let seen = visited.union([name])
+            // Prefer the current manual chain before other branches.
+            let members = group.members.sorted { ($0 == group.selected ? 0 : 1) < ($1 == group.selected ? 0 : 1) }
+            for member in members {
+                if let tail = visit(member, visited: seen) { return [.init(group: name, member: member)] + tail }
+            }
+            return nil
+        }
+        return visit(root, visited: [])
+    }
+
+    /// Expand nested groups into real nodes once; routing actions never become test targets.
+    public static func delayTargets(_ requested: [String], nodes: [ProxyNode], groups: [ProxyGroup], runtimeKinds: [String: String]) -> [String] {
+        let eligible = Set(testableNames(nodes: nodes, groups: groups, runtimeKinds: runtimeKinds))
+        let catalog = Dictionary(groups.map { ($0.name, $0.members) }, uniquingKeysWith: { _, new in new })
+        var visited = Set<String>(), output: [String] = []
+        func append(_ name: String) {
+            guard visited.insert(name).inserted else { return }
+            if eligible.contains(name) { output.append(name) }
+            else { for member in catalog[name] ?? [] { append(member) } }
+        }
+        for name in requested { append(name) }
+        return output
+    }
+    public static func testableNames(nodes: [ProxyNode], groups: [ProxyGroup], runtimeKinds: [String: String]) -> [String] {
+        let builtins: Set<String> = ["DIRECT", "REJECT", "REJECT-DROP", "PASS", "PASS-RULE", "COMPATIBLE", "GLOBAL"]
+        let localKinds: Set<String> = ["direct", "reject", "rejectdrop", "pass", "passrule", "compatible", "dns", "dnsout"]
+        let groupNames = Set(groups.map(\.name))
+        let configuredKinds = Dictionary(nodes.map { ($0.name, $0.kind) }, uniquingKeysWith: { _, new in new })
+        var seen = Set<String>()
+        return (nodes.map(\.name) + runtimeKinds.keys.sorted()).filter { name in
+            let kind = (runtimeKinds[name] ?? configuredKinds[name] ?? "").lowercased().filter { $0.isLetter || $0.isNumber }
+            return !builtins.contains(name) && !localKinds.contains(kind) && !groupNames.contains(name) && seen.insert(name).inserted
+        }
+    }
     /// Manual groups have a deterministic first-member default. Automatic groups stay unresolved offline.
     public static func defaultSelections(groups: [ProxyGroup], saved: [String: String]) -> [String: String] {
         var result = saved

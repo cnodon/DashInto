@@ -18,6 +18,10 @@ final class AppModel {
     var groups: [ProxyGroup] = []
     var delays: [String: Int] = [:]
     let delayTests = DelayTestRunner()
+    let delayPreparation = DelayTestPreparation()
+    var lastDelayEndpoint = LatencyTestEndpoint.cloudflare
+    @ObservationIgnored private var frozenSortDelays: [String: Int] = [:]
+    var delayTestBusy: Bool { delayPreparation.isPreparing || delayTests.isRunning }
     var testingNames: Set<String> { delayTests.testingNames }
     var traffic: [TrafficSample] = []
     var uploadRate = 0.0
@@ -27,11 +31,17 @@ final class AppModel {
     var refreshingProfileID: UUID?
     let dashboard = DashboardMonitor()
     let updates = AppUpdates()
+    let subscriptionUpdates = SubscriptionUpdates()
+    @ObservationIgnored private let subscriptionRefresher: SubscriptionRefresher
+    @ObservationIgnored private var automaticSubscriptionTask: Task<Void, Never>?
+    @ObservationIgnored private var automaticSubscriptionRefresh: Task<ProfileLibrary, Error>?
+    @ObservationIgnored private var subscriptionRefreshEpoch = 0
     var homeGroupName: String?
     var proxyKinds: [String: String] = [:]
     var delayDates: [String: Date] = [:]
     @ObservationIgnored let store: ProfileStore
     @ObservationIgnored private var lastSampleSession: String?
+    @ObservationIgnored private var lastNetworkRevision: Int?
     @ObservationIgnored private var lastGroupRefresh = Date.distantPast
     @ObservationIgnored private var healthyGeneration: String?
     @ObservationIgnored private var loading = false
@@ -88,11 +98,16 @@ final class AppModel {
         return name == "DIRECT" ? "直接连接" : name
     }
     var proxyTestNames: [String] {
-        let builtins: Set<String> = ["DIRECT", "REJECT", "REJECT-DROP", "PASS", "COMPATIBLE", "GLOBAL"]
-        let groupNames = Set(displayGroups.map(\.name))
-        var seen = Set<String>()
-        let candidates = (activeSummary?.nodes.map(\.name) ?? []) + proxyKinds.keys.sorted()
-        return candidates.filter { !builtins.contains($0) && !groupNames.contains($0) && seen.insert($0).inserted }
+        ProxySelection.testableNames(nodes: activeSummary?.nodes ?? [], groups: displayGroups, runtimeKinds: proxyKinds)
+    }
+    func sortedProxyNames(_ names: [String], order: String) -> [String] {
+        let eligible = Set(proxyTestNames)
+        // Group aliases and routing actions must not rank as fast nodes (e.g. DIRECT = 0).
+        return (ProxyNodeSortOrder(rawValue: order) ?? .configuration)
+            .sorted(names, delays: (delayTestBusy ? frozenSortDelays : delays).filter { eligible.contains($0.key) })
+    }
+    func delayTargets(_ names: [String]) -> [String] {
+        ProxySelection.delayTargets(names, nodes: activeSummary?.nodes ?? [], groups: displayGroups, runtimeKinds: proxyKinds)
     }
     var canEditRoutes: Bool { !busy && !connection.step.inProgress && (tunnel.phase == .stopped || tunnel.runtime != nil) }
     var routeDescription: String {
@@ -101,6 +116,15 @@ final class AppModel {
         return "按不同用途分流 · 无需逐个选择"
     }
 
+    static var automaticRefreshUITest: Bool {
+        #if DEBUG && targetEnvironment(simulator)
+        CommandLine.arguments.contains("--ui-test-blocked-refresh") && CommandLine.arguments.contains {
+            $0.hasPrefix("--ui-test-library=") && UUID(uuidString: String($0.dropFirst("--ui-test-library=".count))) != nil
+        }
+        #else
+        false
+        #endif
+    }
     init() {
         let driver = TunnelController()
         tunnel = driver; connection = ConnectionCoordinator(driver: driver)
@@ -118,7 +142,26 @@ final class AppModel {
             profileRoot = container.appendingPathComponent("UITestLibraries").appendingPathComponent(id.uuidString)
         }
         #endif
-        store = ProfileStore(root: profileRoot, keyProvider: KeychainKeyProvider(accessGroup: group))
+        let profileStore = ProfileStore(root: profileRoot, keyProvider: KeychainKeyProvider(accessGroup: group))
+        store = profileStore
+        #if DEBUG && targetEnvironment(simulator)
+        let simulateBlockedRefresh = Self.automaticRefreshUITest
+        #endif
+        subscriptionRefresher = SubscriptionRefresher(store: profileStore) { url in
+            #if DEBUG && targetEnvironment(simulator)
+            if simulateBlockedRefresh {
+                try await Task.sleep(for: .seconds(3600))
+                throw CancellationError()
+            }
+            #endif
+            // The encrypted source was approved during import, including explicit HTTP consent.
+            let result = try await SubscriptionClient().download(url, allowInsecureHTTP: url.scheme?.lowercased() == "http")
+            let parsed = try await Task.detached { try NativeConfigImporter.prepare(result.text) }.value
+            try Task.checkCancellation()
+            let prepared = try await NativeResourcePreparer.shared.prepare(parsed)
+            try Task.checkCancellation()
+            return PreparedSubscription(configuration: prepared, usage: result.usage)
+        }
     }
     func load() async {
         guard !loading else { return }
@@ -132,16 +175,52 @@ final class AppModel {
             try? await store.prune(retaining: [tunnel.configuredGeneration].compactMap { $0 })
         } catch { errorMessage = error.localizedDescription }
     }
-    func resume() { tunnel.startPolling { [weak self] in self?.consumeSample() } }
-    func suspend() { tunnel.stopPolling(); dashboard.suspend(); delayTests.cancel(); traffic = [] }
+    func resume() {
+        tunnel.startPolling { [weak self] in self?.consumeSample() }
+        startSubscriptionUpdates()
+    }
+    func startSubscriptionUpdates(restart: Bool = false) {
+        guard restart || automaticSubscriptionTask == nil else { return }
+        if restart { interruptAutomaticSubscriptionRefresh() }
+        automaticSubscriptionTask?.cancel()
+        subscriptionUpdates.schedule(profiles: library.profiles)
+        guard subscriptionUpdates.interval != .disabled else { return }
+        automaticSubscriptionTask = Task { [weak self] in
+            while !Task.isCancelled {
+                await self?.refreshDueSubscriptions()
+                do { try await Task.sleep(for: .seconds(60)) } catch { return }
+            }
+        }
+    }
+    func refreshDueSubscriptions() async {
+        guard !Task.isCancelled, !busy, !loading, !showingImport, !delayTestBusy, !connection.step.inProgress else { return }
+        defer { subscriptionUpdates.schedule(profiles: library.profiles) }
+        let due = library.profiles.filter { subscriptionUpdates.interval.nextDue(for: $0).map { $0 <= Date() } ?? false }
+            .sorted { (subscriptionUpdates.interval.nextDue(for: $0) ?? .distantFuture) < (subscriptionUpdates.interval.nextDue(for: $1) ?? .distantFuture) }
+        for profile in due {
+            guard !Task.isCancelled, subscriptionUpdates.interval != .disabled, !busy, !showingImport, !delayTestBusy, !connection.step.inProgress else { return }
+            await refresh(profile, automatic: true)
+        }
+    }
+    func suspend() { automaticSubscriptionTask?.cancel(); automaticSubscriptionTask = nil; subscriptionUpdates.schedule(profiles: library.profiles); tunnel.stopPolling(); dashboard.suspend(); cancelDelayTests(reason: "App 已进入后台，测速已停止"); traffic = [] }
     func consumeSample() {
         connection.reconcile()
         dashboard.sample(tunnel)
-        guard let runtime = tunnel.runtime else { groups = []; traffic = []; delayTests.cancel(); return }
+        guard tunnel.state == .connected, let runtime = tunnel.runtime else {
+            groups = []; traffic = []
+            delayTests.cancel(reason: tunnel.state == .connected ? "无法读取连接状态，请刷新后重试" : "连接已断开，测速已停止")
+            return
+        }
         if runtime.sessionID != lastSampleSession {
-            delayTests.cancel()
-            lastSampleSession = runtime.sessionID; traffic = []; groups = []; delays = [:]; delayDates = [:]
+            delayTests.reset()
+            lastSampleSession = runtime.sessionID; lastNetworkRevision = runtime.networkRevision; traffic = []; groups = []; delays = [:]; delayDates = [:]
             uploaded = 0; downloaded = 0; lastGroupRefresh = .distantPast
+        }
+        if lastNetworkRevision != runtime.networkRevision {
+            lastNetworkRevision = runtime.networkRevision
+            invalidateDelayMeasurements(reason: "网络已切换，以下为上次结果，请重新测速")
+            connection.networkChanged(); connection.reconcile()
+            dashboard.invalidateNetwork(); dashboard.refreshNetwork(tunnel)
         }
         let dictionary = (try? JSONSerialization.jsonObject(with: Data(runtime.trafficJSON.utf8))) as? [String: Any] ?? [:]
         uploadRate = (dictionary["up"] as? NSNumber)?.doubleValue ?? 0
@@ -159,7 +238,8 @@ final class AppModel {
         }
     }
     func toggleConnection() async {
-        if connection.step.inProgress || tunnel.phase != .stopped { delayTests.cancel(); connection.cancel(); return }
+        interruptAutomaticSubscriptionRefresh()
+        if connection.step.inProgress || tunnel.phase != .stopped { cancelDelayTests(); connection.cancel(); return }
         guard let profile = activeProfile else {
             if library.profiles.isEmpty { showingImport = true } else { selectedTab = .subscriptions }
             return
@@ -175,7 +255,8 @@ final class AppModel {
     }
     func useAndConnect(_ profile: Profile) {
         guard !connection.step.inProgress, !busy else { return }
-        delayTests.cancel(); homeGroupName = nil
+        interruptAutomaticSubscriptionRefresh()
+        delayPreparation.cancel(); delayTests.reset(); homeGroupName = nil
         selectedTab = .home; notice = nil
         connection.start(profile) { [weak self] in
             guard let self else { throw CancellationError() }
@@ -188,7 +269,8 @@ final class AppModel {
         if tunnel.phase != .stopped { useAndConnect(profile); return }
         await perform {
             self.library = try await self.store.select(profile.id)
-            self.groups = []; self.delays = [:]; self.traffic = []; self.homeGroupName = nil; self.proxyKinds = [:]
+            self.delayPreparation.cancel(); self.delayTests.reset()
+            self.groups = []; self.delays = [:]; self.delayDates = [:]; self.traffic = []; self.homeGroupName = nil; self.proxyKinds = [:]
             self.selectedTab = .home
         }
     }
@@ -205,18 +287,38 @@ final class AppModel {
             self.library = try await self.store.delete(profile.id)
         }
     }
-    func refresh(_ profile: Profile) async {
+    func refresh(_ profile: Profile, automatic: Bool = false) async {
+        guard !busy, !connection.step.inProgress, refreshingProfileID == nil else { return }
+        // Automatic downloads must never lock connection, selection or mode controls.
+        if !automatic { busy = true }
         refreshingProfileID = profile.id
-        defer { refreshingProfileID = nil }
-        await perform {
-            let envelope = try await self.store.envelope(profileID: profile.id, generation: profile.selectedVersion)
-            guard let source = envelope.sourceURL, let url = URL(string: source) else { throw DashError.message("本地文件没有订阅地址，请重新导入文件。") }
-            let result = try await SubscriptionClient().download(url)
-            let parsed = try await Task.detached { try NativeConfigImporter.prepare(result.text) }.value
-            let prepared = try await NativeResourcePreparer.shared.prepare(parsed)
-            self.library = try await self.store.importConfiguration(prepared, name: profile.name, sourceURL: url, replacing: profile.id, usage: result.usage, retaining: [self.tunnel.configuredGeneration].compactMap { $0 })
-            try? await self.store.prune(retaining: [self.tunnel.configuredGeneration].compactMap { $0 })
-            self.notice = self.tunnel.state.isActive ? "新版本已保存。重新连接后应用。" : "订阅已更新。"
+        let refreshEpoch = subscriptionRefreshEpoch
+        defer {
+            if !automatic { busy = false }
+            refreshingProfileID = nil
+            subscriptionUpdates.schedule(profiles: library.profiles)
+        }
+        do {
+            if automatic {
+                let retained = [tunnel.configuredGeneration].compactMap { $0 }
+                let operation = Task { try await subscriptionRefresher.refresh(profileID: profile.id, retaining: retained) }
+                automaticSubscriptionRefresh = operation
+                defer { automaticSubscriptionRefresh = nil }
+                let updated = try await withTaskCancellationHandler { try await operation.value } onCancel: { operation.cancel() }
+                guard refreshEpoch == subscriptionRefreshEpoch else { return }
+                library = updated
+            } else {
+                library = try await subscriptionRefresher.refresh(profileID: profile.id, retaining: [tunnel.configuredGeneration].compactMap { $0 })
+            }
+            try? await store.prune(retaining: [tunnel.configuredGeneration].compactMap { $0 })
+            if !automatic { notice = tunnel.state.isActive ? "新版本已保存。重新连接后应用。" : "订阅已更新。" }
+        } catch {
+            if !automatic || refreshEpoch == subscriptionRefreshEpoch {
+                if let current = try? await store.library(), !automatic || refreshEpoch == subscriptionRefreshEpoch { library = current }
+            }
+            if !automatic && !Task.isCancelled && !(error is CancellationError) {
+                errorMessage = "订阅更新失败，已保留原配置。请检查网络和订阅有效期后重试。"
+            }
         }
     }
     func rollback(_ profile: Profile, version: ProfileVersion) async {
@@ -253,30 +355,110 @@ final class AppModel {
     func select(group: ProxyGroup, member: String) async {
         guard canEditRoutes, group.isSelectable, group.members.contains(member), let profile = displayProfile else { return }
         await perform {
-            if self.tunnel.state == .connected {
-                let session = self.tunnel.runtime?.sessionID
-                _ = try await self.tunnel.request("select", parameters: ["group": group.name, "name": member])
-                await self.refreshGroups(force: true)
-                guard self.tunnel.runtime?.sessionID == session,
-                      self.groups.first(where: { $0.name == group.name })?.selected == member else {
-                    throw DashError.message("线路切换尚未确认，请刷新后重试。")
-                }
-            }
-            self.library = try await self.store.rememberSelection(profileID: profile.id, group: group.name, member: member)
+            try await self.applySelection(group: group.name, member: member, profileID: profile.id)
             self.dashboard.invalidateNetwork()
             self.dashboard.refreshNetwork(self.tunnel)
             self.notice = self.tunnel.state == .connected ? "线路已切换，影响新连接。" : "已保存，下次连接使用。"
         }
     }
+    private func applySelection(group: String, member: String, profileID: UUID) async throws {
+        if tunnel.state == .connected {
+            let session = tunnel.runtime?.sessionID
+            _ = try await tunnel.request("select", parameters: ["group": group, "name": member])
+            await refreshGroups(force: true)
+            guard tunnel.runtime?.sessionID == session, groups.first(where: { $0.name == group })?.selected == member else {
+                throw DashError.message("线路切换尚未确认，请刷新后重试。")
+            }
+        }
+        library = try await store.rememberSelection(profileID: profileID, group: group, member: member)
+    }
+    func nodeSelectionPath(_ name: String, global: Bool = false) -> [ProxyRouteChoice]? {
+        guard proxyTestNames.contains(name), global || mode != .direct,
+              let root = global ? "GLOBAL" : homeRouteTarget else { return nil }
+        return ProxySelection.manualPath(to: name, from: root, groups: displayGroups)
+    }
+    /// Select the manual chain that actually reaches this node; never silently change routing mode.
+    func useNode(_ name: String, global: Bool = false) async -> Bool {
+        guard canEditRoutes, let profile = displayProfile, let path = nodeSelectionPath(name, global: global) else {
+            errorMessage = "当前策略不能手动选择此节点，请刷新节点列表后重试。"; return false
+        }
+        let wasConnected = tunnel.state == .connected
+        var saved = false
+        await perform {
+            // Set the leaf first, then switch the parent to the prepared branch.
+            for choice in path.reversed() {
+                try await self.applySelection(group: choice.group, member: choice.member, profileID: profile.id)
+            }
+            if global { try await self.applyMode(.global, profileID: profile.id) }
+            self.dashboard.invalidateNetwork(); self.dashboard.refreshNetwork(self.tunnel)
+            self.notice = wasConnected ? "节点已切换，对新连接生效。" : nil
+            saved = true
+        }
+        guard saved else { return false }
+        if !wasConnected, let current = library.profiles.first(where: { $0.id == profile.id }) { useAndConnect(current) }
+        return true
+    }
+    func invalidateDelayMeasurements(reason: String) {
+        delayPreparation.cancel(reason: delayPreparation.isPreparing ? reason : nil)
+        delayTests.invalidate(reason: reason)
+        delays = [:]; delayDates = [:]; frozenSortDelays = [:]
+    }
+    func cancelDelayTests(reason: String? = nil) {
+        let wasPreparing = delayPreparation.isPreparing
+        delayPreparation.cancel(reason: wasPreparing ? (reason ?? "已取消测速") : nil)
+        delayTests.cancel(reason: reason)
+    }
     func testDelay(_ name: String) async { startDelayTests([name]) }
-    func startDelayTests(_ names: [String]) {
-        guard tunnel.state == .connected, let session = tunnel.runtime?.sessionID else { return }
+    /// nil requests the entire freshly loaded catalog, including provider nodes.
+    func startDelayTests(_ requestedNames: [String]? = nil) {
+        guard !delayTestBusy else { return }
+        tunnel.refreshState()
+        guard tunnel.state == .connected else {
+            delayPreparation.cancel(reason: "请先在首页连接 VPN，再测试节点延迟。")
+            notice = "需要先连接 VPN，节点测速不会自动开启连接。"
+            return
+        }
+        let profileID = runningProfile?.id
+        let generation = tunnel.configuredGeneration
+        let expectedSession = tunnel.runtime?.sessionID
+        let expectedNetwork = tunnel.runtime?.networkRevision
+        frozenSortDelays = delays
+        delayPreparation.start(prepare: { [weak self] in
+            guard let self else { throw CancellationError() }
+            await self.tunnel.updateRuntime()
+            try Task.checkCancellation()
+            guard self.tunnel.state == .connected, let runtime = self.tunnel.runtime else {
+                throw DashError.message("无法读取 VPN 状态，请重新连接后重试。")
+            }
+            guard self.runningProfile?.id == profileID, self.tunnel.configuredGeneration == generation,
+                  expectedSession == nil || (expectedSession == runtime.sessionID && expectedNetwork == runtime.networkRevision) else {
+                throw DashError.message("连接已变化，请重新测速。")
+            }
+            // Synchronize the session before launching workers; the next polling tick must not
+            // reset a batch that was started immediately after connection establishment.
+            self.consumeSample()
+            await self.refreshGroups(force: true)
+            try Task.checkCancellation()
+            guard self.tunnel.state == .connected, self.tunnel.runtime?.sessionID == runtime.sessionID,
+                  self.runningProfile?.id == profileID, self.tunnel.runtime?.networkRevision == runtime.networkRevision else { throw DashError.message("连接已变化，请重新测速。") }
+            return self.delayTargets(requestedNames ?? self.proxyTestNames)
+        }, ready: { [weak self] names in
+            self?.runDelayTests(names)
+        })
+    }
+    private func runDelayTests(_ names: [String]) {
+        guard tunnel.state == .connected, let session = tunnel.runtime?.sessionID else {
+            delayPreparation.cancel(reason: "连接已断开，请连接后重试。"); return
+        }
         let profile = runningProfile?.id
+        let network = tunnel.runtime?.networkRevision
+        let endpoint = LatencyTestEndpoint(rawValue: UserDefaults.standard.string(forKey: "latencyTestEndpoint") ?? "") ?? .cloudflare
+        lastDelayEndpoint = endpoint
         delayTests.start(names: names, isCurrent: { [weak self] in
-            self?.tunnel.state == .connected && self?.tunnel.runtime?.sessionID == session && self?.runningProfile?.id == profile
+            self?.tunnel.state == .connected && self?.tunnel.runtime?.sessionID == session && self?.runningProfile?.id == profile && self?.tunnel.runtime?.networkRevision == network
         }, test: { [weak self] name in
-            guard let self, self.tunnel.runtime?.sessionID == session else { throw CancellationError() }
-            let data = try await self.tunnel.request("delay", parameters: ["name": name])
+            guard let self, self.tunnel.runtime?.sessionID == session, self.tunnel.runtime?.networkRevision == network else { throw CancellationError() }
+            let data = try await self.tunnel.request("delay", parameters: ["name": name, "endpoint": endpoint.rawValue])
             let root = try JSONSerialization.jsonObject(with: data) as? [String: Any] ?? [:]
             return (root["delay"] as? NSNumber)?.intValue ?? -2
         }, receive: { [weak self] name, delay in
@@ -286,23 +468,30 @@ final class AppModel {
     func setMode(_ mode: RoutingMode) async {
         guard canEditRoutes, let profile = displayProfile else { return }
         await perform {
-            if self.tunnel.state == .connected {
-                let session = self.tunnel.runtime?.sessionID
-                _ = try await self.tunnel.request("mode", parameters: ["mode": mode.rawValue])
-                await self.tunnel.updateRuntime()
-                guard self.tunnel.runtime?.sessionID == session, self.tunnel.runtime?.mode == mode.rawValue else {
-                    throw DashError.message("连接方式尚未确认，请重试。")
-                }
-            }
-            self.library = try await self.store.rememberMode(profileID: profile.id, mode: mode)
-            await self.refreshGroups(force: true)
-            self.dashboard.invalidateNetwork()
-            self.dashboard.refreshNetwork(self.tunnel)
+            try await self.applyMode(mode, profileID: profile.id)
+            self.dashboard.invalidateNetwork(); self.dashboard.refreshNetwork(self.tunnel)
         }
+    }
+    private func applyMode(_ mode: RoutingMode, profileID: UUID) async throws {
+        if tunnel.state == .connected {
+            let session = tunnel.runtime?.sessionID
+            _ = try await tunnel.request("mode", parameters: ["mode": mode.rawValue])
+            await tunnel.updateRuntime()
+            guard tunnel.runtime?.sessionID == session, tunnel.runtime?.mode == mode.rawValue else {
+                throw DashError.message("连接方式尚未确认，请重试。")
+            }
+        }
+        library = try await store.rememberMode(profileID: profileID, mode: mode)
+        await refreshGroups(force: true)
+    }
+    func interruptAutomaticSubscriptionRefresh() {
+        subscriptionRefreshEpoch += 1
+        automaticSubscriptionRefresh?.cancel()
     }
     func perform(_ operation: @MainActor () async throws -> Void) async {
         guard !busy, !connection.step.inProgress else { return }
         busy = true; defer { busy = false }
+        interruptAutomaticSubscriptionRefresh()
         do { try await operation() } catch { errorMessage = error.localizedDescription }
     }
 }

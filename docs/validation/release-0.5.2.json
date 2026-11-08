@@ -1,0 +1,56 @@
+{
+  "app": "DashInto",
+  "version": "0.5.2",
+  "build": 17,
+  "date": "2026-11-04",
+  "rootCauses": [
+    "0.5.1 automatic subscription refresh held global busy across network preparation, disabling home connect and route editing",
+    "Proxy leaf list only exposed delay tests; no selection action"
+  ],
+  "fixes": [
+    "Automatic refresh has separate in-flight state and never writes global busy",
+    "User connection, selection and mode actions cancel automatic download; epoch fences late UI library writes",
+    "Automatic cleanup cannot clear a user operation busy flag",
+    "Proxy leaf sheet supports manual selector paths with offline select-and-connect and online readback",
+    "Automatic/direct strategy requires explicit global choice; rules are not silently changed"
+  ],
+  "validation": {
+    "releaseUnitTestsPassed": 93,
+    "simulatorUITestsPassed": 4,
+    "uiScope": [
+      "blocked auto download leaves home connection and selection enabled; selection persists",
+      "home connect cancels blocked auto download and reaches real simulator driver limitation",
+      "proxy leaf selection starts connection, direct mode requires explicit global selection",
+      "existing import, selection, mode, sorting and offline measurement flow"
+    ],
+    "releaseBuild": "passed",
+    "signing": "app and tunnel passed",
+    "releaseTestFlag": "--ui-test-blocked-refresh absent",
+    "visualReview": "synthetic node selection screenshot inspected",
+    "whitespaceCheck": "passed"
+  },
+  "phone": {
+    "device": "PKR",
+    "install": "passed_in_place",
+    "readback": "0.5.2 (17)",
+    "launch": "blocked_by_iOS_device_locked",
+    "vpnActions": "none",
+    "uninstalledOrReset": false
+  },
+  "limits": [
+    "No true-device VPN connectivity or online node-switch verification this turn",
+    "Synthetic blocked-download tests reproduce UI lock, not actual subscription-server availability",
+    "Packet Tunnel and automatic groups remain subject to imported routing policy"
+  ],
+  "commitOrPush": "not performed",
+  "evidence": {
+    "unit": ".build/connection-052-unit.log",
+    "ui": ".build/connection-052-ui.log",
+    "release": ".build/connection-052-release.log",
+    "signing": ".build/connection-052-signing.json",
+    "install": ".build/install-052-result.json",
+    "launch": ".build/install-052-launch.json",
+    "readback": ".build/install-052-version.json",
+    "screenshot": "docs/screenshots/node-connection-052.png"
+  }
+}

@@ -1,0 +1,202 @@
+{
+  "app": "DashInto",
+  "version": "0.4.6",
+  "build": 10,
+  "date": "2026-11-01",
+  "unitTests": {
+    "configuration": "Release",
+    "passed": 61,
+    "failed": 0,
+    "evidence": ".build/phone-046-unit-final.log"
+  },
+  "simulatorUITests": {
+    "uniqueCasesPassed": 6,
+    "initialPassed": 5,
+    "initialFailure": "Legacy invalid-URL test used HTTP, now a supported scheme; fixture changed to FTP",
+    "correctedCaseRetry": "passed",
+    "firstRetryEnvironmentFailure": "Simulator server died before test startup; serial retry passed",
+    "evidence": [
+      ".build/phone-046-ui-final.log",
+      ".build/phone-046-ui-retry-final.log"
+    ]
+  },
+  "releaseBuild": "passed",
+  "signing": "passed",
+  "releaseValidationEntryAbsent": true,
+  "physicalReleaseUIAutomation": {
+    "status": "could_not_initialize",
+    "reason": "Timed out while enabling automation mode",
+    "evidence": ".build/phone-046-physical.log"
+  },
+  "physicalProductionFlow": {
+    "configuration": "Debug with explicit single-use request; no private URL in source or launch arguments",
+    "status": "passed",
+    "beforeFinalCatalogFilter": false,
+    "result": {
+      "appVersion": "0.4.6 (10)",
+      "checks": [
+        {
+          "check": "import",
+          "geodataCount": 1,
+          "groups": 1,
+          "nodes": 1,
+          "passed": true,
+          "protocols": [
+            "vless"
+          ],
+          "rules": 9
+        },
+        {
+          "check": "approved-source-preserved-for-refresh",
+          "passed": true
+        },
+        {
+          "check": "exact-import-generation",
+          "passed": true
+        },
+        {
+          "check": "default-routing-https",
+          "passed": true,
+          "targetsPassed": 2
+        },
+        {
+          "check": "packet-tunnel-and-ipc",
+          "coreVersion": "1.19.33",
+          "passed": true
+        },
+        {
+          "bytes": 0,
+          "check": "https-204",
+          "httpStatus": 204,
+          "passed": true
+        },
+        {
+          "bytes": 68,
+          "check": "https-apple",
+          "httpStatus": 200,
+          "passed": true
+        },
+        {
+          "bytes": 110694,
+          "check": "observed-tunnel-bytes",
+          "passed": true
+        },
+        {
+          "check": "batch-node-delay",
+          "completed": 1,
+          "failed": 0,
+          "passed": true,
+          "reachable": 1,
+          "total": 1
+        },
+        {
+          "check": "homepage-websites",
+          "passed": true,
+          "results": [
+            {
+              "site": "OpenAI",
+              "state": "available"
+            },
+            {
+              "site": "Claude",
+              "state": "available"
+            },
+            {
+              "site": "Google",
+              "state": "available"
+            },
+            {
+              "site": "YouTube",
+              "state": "timeout"
+            }
+          ]
+        },
+        {
+          "check": "egress-available",
+          "passed": true
+        },
+        {
+          "check": "disconnect",
+          "passed": true
+        },
+        {
+          "bytes": 68,
+          "check": "network-after-disconnect",
+          "httpStatus": 200,
+          "passed": true
+        },
+        {
+          "bytes": 69,
+          "check": "https-after-reconnect",
+          "httpStatus": 200,
+          "passed": true
+        },
+        {
+          "check": "reconnect",
+          "passed": true
+        }
+      ],
+      "mode": "subscription",
+      "passed": true,
+      "platform": "physical iPhone Packet Tunnel",
+      "runID": "5cbe9367-a6f6-4fe4-8d56-ff98c51b5a4c",
+      "sampledPeakCoreMemoryBytes": 13125328,
+      "stage": "completed",
+      "systemState": "disconnected",
+      "terminal": true,
+      "timestamp": "2026-11-01T13:44:21Z"
+    },
+    "evidence": ".build/phone-046-resume-result.json"
+  },
+  "catalogFix": {
+    "identifiedRuntimeExtraType": "PassRule",
+    "problem": "Core routing placeholder counted as a second node and failed delay test",
+    "test": "Production filter regression passed",
+    "postFixPhysicalRetest": {
+      "status": "passed",
+      "actualNodes": 1,
+      "tested": 1,
+      "reachable": 1,
+      "failed": 0,
+      "scope": "Shared production model and queue on physical device; not UI automation"
+    }
+  },
+  "httpSubscription": {
+    "explicitImportConfirmation": true,
+    "approvalLimitedToOriginalHTTPOrigin": true,
+    "rejectsHTTPSDowngrade": true,
+    "refreshUsesApprovedEncryptedSource": true,
+    "remoteProviderAndGeodataStillRequireHTTPS": true
+  },
+  "providedSubscription": {
+    "nodes": 1,
+    "protocols": [
+      "vless"
+    ],
+    "groups": 1,
+    "rules": 9,
+    "providerUsageHeader": false,
+    "providerTitleHeader": false,
+    "savedName": "测试订阅1101"
+  },
+  "finalInstallation": {
+    "configuration": "Release",
+    "device": "PKR",
+    "installedVersion": "0.4.6 (10)",
+    "method": "in_place_update",
+    "result": "passed",
+    "libraryPreserved": true,
+    "launchAfterFinalReinstall": "passed",
+    "vpnLeftConnected": false,
+    "evidence": ".build/phone-046-resume-final-version.json",
+    "launchEvidence": ".build/phone-046-resume-final-launch.json",
+    "installEvidence": ".build/phone-046-resume-final-install.json"
+  },
+  "evidence": {
+    "release": ".build/phone-046-release-final.log",
+    "signing": ".build/phone-046-signing-final.json",
+    "importPreflight": ".build/phone-20261101-import-preflight.log",
+    "phoneFlow": ".build/phone-046-resume-result.json"
+  },
+  "commitOrPush": "not_requested"
+}

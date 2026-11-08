@@ -2,9 +2,16 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<!-- User-supplied HTTP subscriptions require per-import approval in SubscriptionTransport. -->
+		<key>NSAllowsArbitraryLoads</key>
+		<true/>
+	</dict>
 	<key>BGTaskSchedulerPermittedIdentifiers</key>
 	<array>
 		<string>app.clashdash.update-check</string>
+		<string>app.clashdash.subscription-refresh</string>
 	</array>
 	<key>CFBundleDisplayName</key>
 	<string>DashInto</string>
