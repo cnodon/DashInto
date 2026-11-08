@@ -1,0 +1,52 @@
+{
+  "app": "DashInto",
+  "version": "0.5.4",
+  "build": 19,
+  "date": "2026-11-08",
+  "change": "Adaptive iPad navigation, two-column home, readable list widths and taller traffic chart; shared iPhone/iPad functionality unchanged",
+  "validation": {
+    "releaseUnitTestsPassed": 93,
+    "iPadUITests": {
+      "device": "iPad (A16) simulator",
+      "os": "iPadOS 26.5",
+      "passed": 4,
+      "coverage": [
+        "sidebar destinations and no duplicate tab strip",
+        "import sheet access",
+        "rotation preserves pushed settings detail",
+        "rotation preserves proxy search and results sheet",
+        "two-column connected dashboard",
+        "accessibility text uses single column"
+      ]
+    },
+    "iPhoneUITests": {
+      "device": "iPhone 17 Pro simulator",
+      "os": "iOS 26.5",
+      "passed": 3,
+      "coverage": [
+        "five destinations and update entry",
+        "node selection during automatic refresh without implicit mode switch",
+        "read-only dashboard preview"
+      ]
+    },
+    "dashboardFinalCheck": "Passed again after chart height change, including light/portrait/dark captures",
+    "releaseBuild": "passed for physical iPad destination, iOS 17.0 deployment target",
+    "signing": "codesign --verify --deep --strict passed",
+    "appAndTunnelVersion": "0.5.4 (19), universal families [1,2]"
+  },
+  "limits": [
+    "No installation or interaction with physical devices in this UI-only change",
+    "Physical VPN tests were performed in the preceding 0.5.3 diagnosis, not rerun or claimed for 0.5.4",
+    "Narrow-window behavior is width-driven; actual Split View and Stage Manager window manipulation not exercised",
+    "Read-only dashboard fixture contains explicitly labelled synthetic data, not a VPN connection"
+  ],
+  "evidence": {
+    "unit": ".build/ipad-054-unit.log",
+    "iPadUI": ".build/ipad-ui-054-r2.xcresult",
+    "iPhoneUI": ".build/iphone-ui-054.xcresult",
+    "finalDashboard": ".build/ipad-ui-054-final.xcresult",
+    "releaseBuild": ".build/ipad-054-release-final.log",
+    "finalDashboardScreenshots": ".build/ipad-ui-054-capture.xcresult",
+    "screenshots": "docs/screenshots/054-iPadDashboard*.png"
+  }
+}

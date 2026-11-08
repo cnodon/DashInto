@@ -2,6 +2,26 @@
 
 先读 [实施与验证记录](IMPLEMENTATION_STATUS.md)、[本地真机验收](LOCAL_ACCEPTANCE.md) 和根目录 README，沿用现有工程。原始 [产品技术规划](CLASH_DASH_PLAN.md) 是目标规格，不能把其验收门槛当成已经通过。
 
+## iPad 自适应界面（2026-11-08，0.5.4）
+
+当前版本 **0.5.4 (19)**，包含之前未提交的 iPadOS 17 兼容与显式 DEBUG 真机诊断工具。用户授权实施 iPad UI/UX 并提交代码；功能和网络核心保持不变。本轮不操作真机、不重导订阅。实现规则见 [iPad 布局](IPAD_UX.md)。
+
+RootView 在 iPad 窗口宽度 ≥1,000 pt 时显示侧栏，并在各 Tab 的 NavigationStack 上隐藏系统 Tab；不能只在外层 TabView 设置，否则新版 iPadOS 的浮动 Tab 仍会重复显示。保持同一个 TabView 的结构身份，旋转后保留搜索和已推入的详情。DashboardLayout 按内容宽度 ≥740 pt 双栏，无订阅或辅助功能大字体则单栏。首页连接、流量、订阅与网站组件共用现有业务状态；iPad 图表高度提升到 144 pt。列表仅调整滚动区域边距，不缩窄导航栏。
+
+93 项 Release 单测、4 项 iPad UI 回归、3 项 iPhone 核心 UI 回归通过；最终图表高度与深色外观再次验证。Release App/扩展 17.0 目标构建与签名通过，未在本轮安装到真机或复测 VPN。详细证据与窗口测试限制见 `docs/validation/release-0.5.4.json`。此前 0.5.3 记录中的“未提交”仅描述对应历史轮次，本次提交包含这些改动。
+
+## iPad 订阅导入与 BigME 默认节点修正（2026-11-08）
+
+用户要求添加订阅后，用显式一次性 DEBUG 请求调用生产导入器、资源校验和加密存储，添加 Skyward 36 节点、Clash 线路 1 节点、BigME 50 节点；三项保存通过，保留原选中项。DEBUG DeviceValidation 新增 import-only 批量去重导入，不自动连接；凭据请求仅在本机 ignored .build 和设备缓存，读取后删除，不得提交。
+
+后续用户报告 iPad 连接失败。诊断确认核心 ready、实际所选为 BigME，系统无断开错误；默认路由落到了订阅流量说明占位项，健康 limited，Cloudflare -1004。三份订阅实测：Clash 线路和 Skyward 默认路由 Apple/Cloudflare 均通，BigME 前五项说明节点超时、实际 HK 01 延迟 287ms。用生产 useNode 选择并持久化 HK 01 的手动策略链，保留 rule 模式，网络检查 ready、HTTPS 204、隧道观测流量大于零。不是 iPad 签名/授权/核心启动失败，也未判定整份 BigME 订阅失效。没有增加通用的信息节点自动过滤逻辑。
+
+本地证据 `.build/ipad-connection-summary.json`，原始结果含用户节点名称，仅本机保存。DeviceValidation 增加 diagnose-only / compare-existing / connect-existing 与可选 repairNode 的显式开发验证路径，均在 DEBUG 内；正式版不包含入口。当前生产代码仍为 0.5.3。后续修改不要丢掉此前 iPadOS 17 兼容改动；本轮未提交或推送。
+
+## iPadOS 17 安装兼容（2026-11-08，0.5.3）
+
+当前工作区 **0.5.3 (18)**。用户连接的 iPad 为第六代，iPadOS 17.7.5，原最低 iOS 18 无法安装。App/扩展 deployment target 和共享包平台统一改为 17.0，原有设备族 1,2 保留；固定核心对象 min OS 15.0，无需更换 SDK。93 项 Release 单测、iOS 17 目标构建与主 App/扩展签名通过，已配对并将该 iPad 注册到开发签名配置，成功安装并由 CoreDevice 启动正式版。应用/进程列表查询在旧系统上出现 CoreDevice StreamingAction 错误，因此没有声称完成安装版本回读或进程存活采样；安装包本身版本已校验。没有导入订阅或启动 VPN，没有操作其他手机。证据见 `docs/validation/release-0.5.3.json`。本轮兼容改动未提交/推送。
+
 ## 首页连接与代理节点选择回归修复（2026-11-04，0.5.2）
 
 当前 **0.5.2 (17)**。用户报告首页无法连接、代理页无法选节点。代码确认 0.5.1 的自动订阅 refresh 设置全局 busy=true，在下载/校验期间禁用首页连接与 canEditRoutes；此外代理页节点总表从来只有测速动作。修复：自动 refresh 不写 busy；perform/useAndConnect/toggleConnection 优先取消自动请求，refreshEpoch 拦截迟到的 UI library 赋值。自动 cleanup 不得清除正在执行的用户 busy 状态。手动更新仍采用独立忙碌反馈。

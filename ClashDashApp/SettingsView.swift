@@ -33,7 +33,7 @@ struct SettingsView: View {
                     HStack { Label("软件更新", systemImage: "arrow.down.circle"); Spacer(); if model.updates.hasUpdate { Text("新版本").font(.caption).foregroundStyle(Color.dashBlue) } }
                 }.accessibilityIdentifier("softwareUpdate")
             }
-        }.listSectionSpacing(.compact).contentMargins(.top, 8, for: .scrollContent).toolbar(.hidden, for: .navigationBar).accessibilityIdentifier("settingsPage")
+        }.listSectionSpacing(.compact).contentMargins(.top, 8, for: .scrollContent).toolbar(.hidden, for: .navigationBar).accessibilityIdentifier("settingsPage").readableList(maximum: 760)
             .onChange(of: subscriptions.intervalRaw) { _, _ in model.startSubscriptionUpdates(restart: true) }
             .onChange(of: latencyEndpoint) { _, _ in
                 model.invalidateDelayMeasurements(reason: "测速目标已更改，以下为上次目标的结果")

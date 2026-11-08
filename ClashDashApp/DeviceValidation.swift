@@ -2,6 +2,7 @@
 import Foundation
 import Network
 import UIKit
+import NetworkExtension
 import ClashDashKit
 
 /// Opt-in physical-device laboratory. Omitted entirely from Release builds.
@@ -28,6 +29,39 @@ import ClashDashKit
             runID = request["runID"] as? String ?? ""
             guard UUID(uuidString: runID) != nil else { throw DashError.message("Invalid validation run") }
             mode = request["mode"] as? String ?? "direct"
+            if mode == "compare-existing" {
+                try await compareSubscriptions(model)
+                return
+            }
+            if mode == "connect-existing" {
+                guard let profile = model.activeProfile else { throw DashError.message("No selected profile") }
+                stage = "connect-existing"; progress(stage, model)
+                model.useAndConnect(profile)
+                try await waitForFlow(model)
+                checks.append(["check": "original-route", "passed": true, "node": model.homeProxyTitle, "mode": model.mode.rawValue])
+                if let node = request["repairNode"] as? String {
+                    guard await model.useNode(node) else { throw DashError.message("Manual node selection unavailable") }
+                    model.connection.retryCheck()
+                    try await waitForFlow(model)
+                    checks.append(["check": "repaired-route", "passed": true, "node": model.homeProxyTitle, "mode": model.mode.rawValue])
+                }
+                checks.append(["check": "connection-state", "passed": true, "step": model.connection.step.rawValue,
+                    "memoryBytes": model.tunnel.runtime?.memoryBytes ?? 0])
+                stage = "check-selected-route"; progress(stage, model)
+                try await checkHTTPS("https://cp.cloudflare.com/generate_204", expected: 204, label: "selected-route-https")
+                await model.tunnel.updateRuntime()
+                checks.append(["check": "selected-route-traffic", "passed": traffic(model) > 0])
+                write(stage: "completed", terminal: true, model: model)
+                return
+            }
+            if mode == "diagnose-only" {
+                try await diagnoseExistingConnection(model)
+                return
+            }
+            if mode == "import-only" {
+                try await importSubscriptions(request, model: model)
+                return
+            }
             let workflow = request["subscriptionWorkflow"] as? Bool == true
             guard ["direct", "subscription"].contains(mode), !TunnelController.isSimulator else { throw DashError.message("Physical device required") }
             progress("prepare-import", model)
@@ -173,6 +207,97 @@ import ClashDashKit
             model.notice = "真机验证未通过：\(stage)"
             write(stage: stage, terminal: true, model: model)
         }
+    }
+    private static func compareSubscriptions(_ model: AppModel) async throws {
+        let original = model.library.selectedProfileID
+        let profiles = model.library.profiles.sorted { ($0.current?.summary.nodes.count ?? 0) < ($1.current?.summary.nodes.count ?? 0) }
+        for profile in profiles {
+            progress("compare-" + profile.name, model)
+            do {
+                model.useAndConnect(profile)
+                try await waitForFlow(model)
+                await model.refreshGroups(force: true)
+                let names = Array(model.proxyTestNames.prefix(6))
+                model.startDelayTests(names)
+                for _ in 0..<600 where model.delayTestBusy { try await Task.sleep(for: .milliseconds(100)) }
+                var item: [String: Any] = ["check": "profile", "name": profile.name, "passed": true,
+                    "step": model.connection.step.rawValue, "delayTotal": model.delayTests.total, "delayPassed": model.delayTests.succeeded,
+                    "delayResults": model.delayTests.names.map { ["node": $0, "delay": model.delayTests.results[$0] ?? -3] as [String: Any] }]
+                let session = URLSession(configuration: .ephemeral)
+                for (key, address) in [("apple", "https://www.apple.com/library/test/success.html"), ("cloudflare", "https://cp.cloudflare.com/generate_204")] {
+                    var request = URLRequest(url: URL(string: address)!); request.timeoutInterval = 10
+                    do { let (_, response) = try await session.data(for: request); item[key] = (response as? HTTPURLResponse)?.statusCode ?? 0 }
+                    catch { item[key] = (error as NSError).code }
+                }
+                session.invalidateAndCancel()
+                checks.append(item)
+            } catch {
+                checks.append(["check": "profile", "name": profile.name, "passed": false, "connectionFailure": model.connection.failure ?? "unknown"])
+            }
+            model.connection.cancel(); try await waitForStop(model)
+        }
+        if let original { model.library = try await model.store.select(original) }
+        write(stage: "compared", terminal: true, model: model)
+    }
+    private static func diagnoseExistingConnection(_ model: AppModel) async throws {
+        let root = await model.store.root.deletingLastPathComponent()
+        if let startup = TunnelStartupStatus.read(from: root) {
+            var item: [String: Any] = ["check": "last-startup", "passed": startup.phase == "ready", "phase": startup.phase,
+                "date": ISO8601DateFormatter().string(from: startup.date)]
+            if let failure = startup.failure, !failure.contains("://") { item["failure"] = String(failure.prefix(500)) }
+            checks.append(item)
+        } else { checks.append(["check": "last-startup", "passed": false, "phase": "absent"]) }
+        checks.append(["check": "library", "passed": true, "profiles": model.library.profiles.map { profile in
+            ["name": profile.name, "selected": profile.id == model.library.selectedProfileID, "nodes": profile.current?.summary.nodes.count ?? 0] as [String: Any]
+        }])
+        let managers = try await NETunnelProviderManager.loadAllFromPreferences()
+        if let manager = managers.first(where: { ($0.protocolConfiguration as? NETunnelProviderProtocol)?.providerBundleIdentifier == DashConstants.tunnelBundleID }) {
+            var item: [String: Any] = ["check": "vpn-preferences", "passed": manager.isEnabled, "status": manager.connection.status.rawValue]
+            let error: NSError? = await withCheckedContinuation { continuation in
+                manager.connection.fetchLastDisconnectError { error in continuation.resume(returning: error as NSError?) }
+            }
+            if let error {
+                item["errorDomain"] = error.domain; item["errorCode"] = error.code
+                if !error.localizedDescription.contains("://") { item["error"] = String(error.localizedDescription.prefix(500)) }
+            }
+            checks.append(item)
+        } else { checks.append(["check": "vpn-preferences", "passed": false, "status": "absent"]) }
+        write(stage: "diagnosed", terminal: true, model: model)
+    }
+    /// Explicit one-time local import. No activation, node selection or VPN changes.
+    private static func importSubscriptions(_ request: [String: Any], model: AppModel) async throws {
+        guard !TunnelController.isSimulator,
+              let entries = request["subscriptions"] as? [[String: String]], !entries.isEmpty, entries.count <= 8 else {
+            throw DashError.message("Invalid import request")
+        }
+        let selected = model.library.selectedProfileID
+        for (index, entry) in entries.enumerated() {
+            progress("import-\(index + 1)", model)
+            do {
+                guard let value = entry["url"] else { throw DashError.message("Missing subscription") }
+                let url = try ImportAddress.subscriptionURL(from: value)
+                var duplicate = false
+                for profile in model.library.profiles where profile.isSubscription {
+                    if try await model.store.envelope(profileID: profile.id, generation: profile.selectedVersion).sourceURL == url.absoluteString {
+                        duplicate = true; break
+                    }
+                }
+                if duplicate { checks.append(["check": "subscription-\(index + 1)", "passed": true, "existing": true]); continue }
+                let downloaded = try await SubscriptionClient().download(url, allowInsecureHTTP: entry["allowInsecureHTTP"] == "true")
+                let parsed = try await Task.detached { try NativeConfigImporter.prepare(downloaded.text) }.value
+                let prepared = try await NativeResourcePreparer.shared.prepare(parsed)
+                let commit = try await model.save(prepared, name: entry["name"] ?? "", url: url, usage: downloaded.usage)
+                guard commit.library.selectedProfileID == selected else { throw DashError.message("Selection changed") }
+                checks.append(["check": "subscription-\(index + 1)", "passed": true, "nodes": prepared.summary.nodes.count,
+                               "providerNodes": prepared.summary.providerNodeCount ?? 0, "groups": prepared.summary.groups.count])
+            } catch {
+                let ns = error as NSError
+                checks.append(["check": "subscription-\(index + 1)", "passed": false, "errorDomain": ns.domain, "errorCode": ns.code])
+            }
+        }
+        model.selectedTab = .subscriptions
+        model.notice = "订阅导入完成"
+        write(stage: "completed", terminal: true, model: model)
     }
     private static func progress(_ stage: String, _ model: AppModel) {
         model.notice = "真机验证：\(stage)"; write(stage: stage, terminal: false, model: model)

@@ -37,7 +37,7 @@ struct HomeTrafficPanel: View {
                     if let selection { RuleMark(x: .value("时间", selection)).foregroundStyle(Color.secondary.opacity(0.4)) }
                 }.chartXScale(domain: end.addingTimeInterval(-60)...end).chartYScale(domain: .automatic(includesZero: true))
                     .chartXAxis(.hidden).chartYAxis { AxisMarks(position: .trailing, values: .automatic(desiredCount: 3)) }
-                    .chartXSelection(value: $selection).frame(height: typeSize.isAccessibilitySize ? 120 : 80)
+                    .chartXSelection(value: $selection).frame(height: typeSize.isAccessibilitySize ? 120 : UIDevice.current.userInterfaceIdiom == .pad ? 144 : 80)
                     .overlay { if samples.isEmpty { Text("等待采样").font(.caption).foregroundStyle(.secondary) } }
                     .accessibilityLabel("最近60秒总流量，蓝色实线下载，绿色虚线上传，单位KB每秒")
                 HStack {

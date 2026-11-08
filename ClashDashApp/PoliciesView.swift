@@ -61,7 +61,7 @@ struct PoliciesView: View {
                 }
             }
         }.contentMargins(.top, 8, for: .scrollContent).listSectionSpacing(.compact)
-            .toolbar(.hidden, for: .navigationBar).accessibilityIdentifier("proxiesPage")
+            .toolbar(.hidden, for: .navigationBar).accessibilityIdentifier("proxiesPage").readableList(maximum: 880)
             .sheet(item: $choosingNode) { choice in NodeConnectionSheet(name: choice.name) }
             .task { await model.refreshGroups() }
             .refreshable { await model.tunnel.updateRuntime(); await model.refreshGroups(force: true) }
@@ -160,7 +160,7 @@ struct PolicyDetailView: View {
                     Text(model.tunnel.state != .connected ? "下次连接使用" : group.isSelectable ? "对新连接生效" : "自动选择节点")
                 }
             } else { ContentUnavailableView("代理组不存在", systemImage: "circle.grid.2x2") }
-        }.navigationTitle(groupName).navigationBarTitleDisplayMode(.inline).searchable(text: $search, prompt: "搜索节点")
+        }.readableList(maximum: 880).navigationTitle(groupName).navigationBarTitleDisplayMode(.inline).searchable(text: $search, prompt: "搜索节点")
             .toolbar { ToolbarItem(placement: .topBarTrailing) { ProxySortMenu(selection: $sortOrder, identifier: "groupProxySortMenu") } }
     }
 }

@@ -99,7 +99,7 @@ struct DeviceInfoView: View {
                 NavigationLink { DiagnosticsView().toolbar(.visible, for: .navigationBar) } label: { Label("运行诊断", systemImage: "stethoscope") }
             }
         }.listSectionSpacing(.compact).contentMargins(.top, 8, for: .scrollContent)
-            .toolbar(.hidden, for: .navigationBar).accessibilityIdentifier("devicePage")
+            .toolbar(.hidden, for: .navigationBar).accessibilityIdentifier("devicePage").readableList(maximum: 760)
             .onAppear { network.start() }.onDisappear { network.stop() }
     }
 }

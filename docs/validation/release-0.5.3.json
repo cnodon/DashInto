@@ -1,0 +1,33 @@
+{
+  "app": "DashInto",
+  "version": "0.5.3",
+  "build": 18,
+  "date": "2026-11-08",
+  "change": "Lower app, extension and shared package minimum to iOS/iPadOS 17; universal device families already supported",
+  "validation": {
+    "releaseUnitTestsPassed": 93,
+    "releaseBuild": "passed with iOS 17 deployment target",
+    "signing": "App and tunnel verified, connected iPad included in both profiles",
+    "coreObjectMinimumOS": "15.0",
+    "codeAvailability": "No source API availability errors at iOS 17 target"
+  },
+  "device": {
+    "type": "iPad (6th generation)",
+    "os": "iPadOS 17.7.5",
+    "pairing": "passed",
+    "developerMode": "enabled",
+    "install": "passed",
+    "launch": "passed; CoreDevice returned process identifier",
+    "installedVersionReadback": "CoreDevice streaming queries failed; version taken from verified installed build",
+    "vpnTest": "not performed"
+  },
+  "evidence": {
+    "build": ".build/ipad-053-build.log",
+    "deviceSigningBuild": ".build/ipad-053-device-signing.log",
+    "unit": ".build/ipad-053-unit.log",
+    "signing": ".build/ipad-053-signing.json",
+    "install": ".build/ipad-053-install.json",
+    "launch": ".build/ipad-053-launch.json"
+  },
+  "commitOrPush": "not performed"
+}

@@ -3,7 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "ClashDashKit",
-    platforms: [.iOS("18.0"), .macOS(.v14)],
+    platforms: [.iOS("17.0"), .macOS(.v14)],
     products: [.library(name: "ClashDashKit", targets: ["ClashDashKit"])],
     dependencies: [.package(path: "../../Vendor/Yams")],
     targets: [

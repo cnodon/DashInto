@@ -12,7 +12,7 @@ struct OverviewView: View {
     private var sampled: Bool { live && !model.traffic.isEmpty }
     private var passed: Bool { live && model.connection.checkedSession == model.tunnel.runtime?.sessionID && model.connection.check?.successful == true }
     var body: some View {
-        ScrollView {
+        DashboardLayout(hasSubscription: model.displayProfile != nil, connected: connected) {
             VStack(spacing: 12) {
                 proxyCard
                 if let error = model.connection.failure ?? model.tunnel.lastError {
@@ -21,25 +21,34 @@ struct OverviewView: View {
                         Button { model.selectedTab = .device } label: { Label("诊断", systemImage: "stethoscope").font(.caption).frame(minHeight: 44) }
                     } }.accessibilityIdentifier("connectionFailure")
                 }
-                if let profile = model.displayProfile {
-                    if connected {
-                        trafficCard.transition(.opacity)
-                        subscriptionCard(profile)
-                        websitesCard.transition(.opacity)
-                        if model.connection.step == .limited {
-                            Button { model.connection.retryCheck() } label: {
-                                Label("部分网络检查未通过 · 重试", systemImage: "arrow.clockwise")
-                                    .font(.caption).foregroundStyle(.orange)
-                            }.frame(minHeight: 44).accessibilityIdentifier("retryNetworkCheck")
-                        }
-                    } else {
-                        subscriptionCard(profile)
+            }
+        } traffic: {
+            if model.displayProfile != nil { trafficCard }
+        } subscription: {
+            if let profile = model.displayProfile {
+                VStack(spacing: 12) {
+                    subscriptionCard(profile)
+                    if model.hasPendingUpdate {
+                        Button("应用更新并重连") { model.useAndConnect(profile) }
+                            .font(.subheadline).disabled(model.connection.step.inProgress || model.busy)
                     }
-                    if model.hasPendingUpdate { Button("应用更新并重连") { model.useAndConnect(profile) }.font(.subheadline).disabled(model.connection.step.inProgress || model.busy) }
                 }
-            }.animation(reduceMotion ? nil : .smooth(duration: 0.3), value: connected)
-                .padding(.horizontal, 16).padding(.vertical, 8).frame(maxWidth: 680).frame(maxWidth: .infinity)
-        }.background(Color.dashBackground).toolbar(.hidden, for: .navigationBar).accessibilityIdentifier("homePage")
+            }
+        } websites: {
+            if model.displayProfile != nil {
+                VStack(spacing: 12) {
+                    websitesCard
+                    if model.connection.step == .limited {
+                        Button { model.connection.retryCheck() } label: {
+                            Label("部分网络检查未通过 · 重试", systemImage: "arrow.clockwise")
+                                .font(.caption).foregroundStyle(.orange)
+                        }.frame(minHeight: 44).accessibilityIdentifier("retryNetworkCheck")
+                    }
+                }
+            }
+        }
+        .animation(reduceMotion ? nil : .smooth(duration: 0.3), value: connected)
+        .background(Color.dashBackground).toolbar(.hidden, for: .navigationBar).accessibilityIdentifier("homePage")
             .sheet(isPresented: $showingSources) { SubscriptionPicker() }
             .sheet(item: $sheet) { HomeDetailSheet(detail: $0).presentationDetents([.medium, .large]).presentationDragIndicator(.visible) }
             .sensoryFeedback(.success, trigger: passed) { _, value in value }

@@ -26,7 +26,7 @@ struct DashboardDesignPreview: View {
         }
     }
     var body: some View {
-        ScrollView {
+        DashboardLayout(hasSubscription: true, connected: true) {
             VStack(spacing: 12) {
                 Label("界面预览 · 示例数据", systemImage: "paintpalette")
                     .font(.caption.weight(.medium)).foregroundStyle(.orange).frame(maxWidth: .infinity, alignment: .leading)
@@ -41,12 +41,15 @@ struct DashboardDesignPreview: View {
                     Label("断开连接", systemImage: "power").font(.headline)
                         .frame(maxWidth: .infinity, minHeight: 54).foregroundStyle(.white).background(.red, in: Capsule())
                 }.padding(.horizontal, 14).padding(.top, 16).padding(.bottom, 16)
+            }
+        } traffic: {
                 HomeTrafficPanel(samples: samples, downloadRate: 1_820_000, uploadRate: 128_000,
                                  downloaded: 128_000_000, uploaded: 9_600_000, connectionCount: 24,
                                  nodeRate: previewNodeRate, address: "203.0.113.42", countryCode: "JP", onEgress: {})
+        } subscription: {
                 DashCard { SubscriptionBalanceView(profile: profile) }
+        } websites: {
                 HomeWebsitesCard(results: sites, checking: false, enabled: false, refresh: {}, select: { _ in })
-            }.padding(.horizontal, 16).padding(.vertical, 8).frame(maxWidth: 680).frame(maxWidth: .infinity)
         }.background(Color.dashBackground).toolbar(.hidden, for: .navigationBar)
             .accessibilityIdentifier("dashboardDesignPreview")
     }

@@ -18,7 +18,7 @@ struct ProfilesView: View {
                 ContentUnavailableView("暂无订阅", systemImage: "rectangle.stack", description: Text("右上角 + 添加"))
             }
         }.contentMargins(.top, 8, for: .scrollContent).listSectionSpacing(.compact)
-            .navigationTitle("").navigationBarTitleDisplayMode(.inline).accessibilityIdentifier("profilesPage")
+            .navigationTitle("").navigationBarTitleDisplayMode(.inline).accessibilityIdentifier("profilesPage").readableList(maximum: 760)
             .toolbar { ToolbarItem(placement: .topBarTrailing) {
                 Button { model.importURL = ""; model.showingImport = true } label: { Image(systemName: "plus") }.accessibilityLabel("添加订阅")
             } }
